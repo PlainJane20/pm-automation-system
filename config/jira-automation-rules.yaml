@@ -1,0 +1,349 @@
+# JIRA Automation Rules
+# Copy these into JIRA Automation UI: Project Settings → Automation
+
+automation_rules:
+
+  # ==========================================================================
+  # RULE 1: BRD Gate Enforcement (CRITICAL)
+  # ==========================================================================
+  - name: "Block Development Without BRD"
+    id: "BRD_GATE_001"
+    priority: "CRITICAL"
+    enabled: true
+
+    trigger:
+      type: "Issue transitioned"
+      transition: "Start Development"
+      from_status: "READY_FOR_DEV"
+      to_status: "IN_PROGRESS"
+
+    conditions:
+      - type: "Issue fields condition"
+        field: "BRD Approved Date"
+        condition: "is empty"
+
+    actions:
+      - type: "Block issue transition"
+        message: |
+          ⛔ Development Cannot Start Without Approved BRD
+
+          This ticket has not completed the BRD approval process.
+
+          Required fields:
+          • BRD Document Link
+          • BRD Approved Date
+
+          Please complete scoping workflow first.
+
+      - type: "Send notification"
+        recipients: "{{issue.assignee}}, {{issue.reporter}}"
+        subject: "BRD Required: {{issue.key}}"
+        body: |
+          Development cannot start on {{issue.key}} without an approved BRD.
+
+          Please work with the BRD Owner to complete the scoping process.
+
+    notes: |
+      This is the MOST IMPORTANT rule - enforces governance gate.
+      No exceptions should be allowed without VP approval.
+
+  # ==========================================================================
+  # RULE 2: Auto-Classify Request Type
+  # ==========================================================================
+  - name: "Auto-Classify Bug vs Feature"
+    id: "AUTO_CLASSIFY_001"
+    enabled: true
+
+    trigger:
+      type: "Issue created"
+
+    conditions:
+      - type: "Issue fields condition"
+        field: "Request Type"
+        condition: "is empty"
+
+    actions:
+      # Keywords suggest Bug
+      - type: "If: Summary or Description contains keywords"
+        keywords: ["error", "broken", "crash", "bug", "fail"]
+        then:
+          - type: "Edit issue"
+            field: "Request Type"
+            value: "Bug"
+          - type: "Add label"
+            label: "auto-classified"
+
+      # Keywords suggest Feature
+      - type: "Else if: Summary contains keywords"
+        keywords: ["add", "new", "create", "feature"]
+        then:
+          - type: "Edit issue"
+            field: "Request Type"
+            value: "Feature"
+          - type: "Add label"
+            label: "auto-classified"
+
+      # Default to Feature
+      - type: "Else"
+        then:
+          - type: "Edit issue"
+            field: "Request Type"
+            value: "Feature"
+
+  # ==========================================================================
+  # RULE 3: Assign BRD Owner Based on Project Area
+  # ==========================================================================
+  - name: "Auto-Assign BRD Owner"
+    id: "BRD_ASSIGNMENT_001"
+    enabled: true
+
+    trigger:
+      type: "Issue transitioned"
+      to_status: "SCOPING_IN_PROGRESS"
+
+    conditions:
+      - type: "Issue fields condition"
+        field: "BRD Owner"
+        condition: "is empty"
+
+    actions:
+      # Map project areas to BRD owners
+      - type: "If: Component equals"
+        component: "Platform"
+        then:
+          - type: "Edit issue"
+            field: "BRD Owner"
+            value: "platform-pm@company.com"
+
+      - type: "Else if: Component equals"
+        component: "Data"
+        then:
+          - type: "Edit issue"
+            field: "BRD Owner"
+            value: "data-pm@company.com"
+
+      # Default to project lead
+      - type: "Else"
+        then:
+          - type: "Edit issue"
+            field: "BRD Owner"
+            value: "{{project.lead}}"
+
+      # Set target date and notify
+      - type: "Edit issue"
+        field: "Target BRD Date"
+        value: "{{now.plusDays(14)}}"
+
+      - type: "Send email"
+        to: "{{issue.BRD Owner}}"
+        subject: "BRD Needed: {{issue.key}}"
+        body: |
+          You have been assigned as BRD Owner for {{issue.key}}.
+
+          Summary: {{issue.summary}}
+          Target completion: {{issue.Target BRD Date}}
+
+          Use this template: [BRD Template Link]
+
+  # ==========================================================================
+  # RULE 4: Stale Ticket Warning (50 days)
+  # ==========================================================================
+  - name: "Warn Before Auto-Closing Stale Tickets"
+    id: "STALE_WARNING_001"
+    enabled: true
+
+    trigger:
+      type: "Scheduled"
+      schedule: "Daily at 9:00 AM"
+
+    for_each:
+      jql: |
+        status IN (SUBMITTED, "AWAITING_SCOPING", "NEEDS_MORE_INFO")
+        AND updated <= -50d
+        AND priority NOT IN (P0, P1)
+        AND labels NOT IN (stale-warning-sent)
+
+    actions:
+      - type: "Add comment"
+        comment: |
+          ⚠️ Inactivity Warning
+
+          This ticket has been inactive for 50 days and will be auto-closed in 10 days.
+
+          To prevent closure:
+          • Add a comment
+          • Update any field
+          • Change status
+
+      - type: "Add label"
+        label: "stale-warning-sent"
+
+      - type: "Send email"
+        to: "{{issue.reporter}}"
+        subject: "Action Needed: {{issue.key}}"
+
+  # ==========================================================================
+  # RULE 5: Auto-Close Stale Tickets (60 days)
+  # ==========================================================================
+  - name: "Auto-Close Stale Tickets"
+    id: "STALE_CLOSE_001"
+    enabled: true
+
+    trigger:
+      type: "Scheduled"
+      schedule: "Daily at 2:00 AM"
+
+    for_each:
+      jql: |
+        status IN (SUBMITTED, "AWAITING_SCOPING", "NEEDS_MORE_INFO")
+        AND updated <= -60d
+        AND priority NOT IN (P0, P1)
+
+    actions:
+      - type: "Add comment"
+        comment: |
+          🗑️ Auto-Closed: Inactivity
+
+          This ticket has been automatically closed due to 60+ days of inactivity.
+
+          To reopen, click "Reopen" and add a comment.
+
+      - type: "Transition issue"
+        transition: "Close"
+
+      - type: "Add label"
+        label: "auto-closed-stale"
+
+      - type: "Send email"
+        to: "{{issue.reporter}}"
+        subject: "Closed: {{issue.key}}"
+
+  # ==========================================================================
+  # RULE 6: Enforce Epic Linkage
+  # ==========================================================================
+  - name: "Require Epic Link Before Development"
+    id: "EPIC_LINK_001"
+    enabled: true
+
+    trigger:
+      type: "Issue transitioned"
+      to_status: "READY_FOR_DEV"
+
+    conditions:
+      - type: "Issue fields condition"
+        field: "Epic Link"
+        condition: "is empty"
+
+    actions:
+      - type: "Block issue transition"
+        message: |
+          All development work must link to an Epic for program-level tracking.
+
+          Please select an Epic or create a new one.
+
+  # ==========================================================================
+  # RULE 7: Auto-Link GitHub PR
+  # ==========================================================================
+  - name: "Link GitHub PR to JIRA"
+    id: "GITHUB_PR_001"
+    enabled: true
+
+    trigger:
+      type: "Webhook"
+      webhook_url: "/webhooks/jira/github-pr"
+      source: "GitHub"
+
+    actions:
+      - type: "Edit issue"
+        field: "PR Link"
+        value: "{{webhook.pull_request.html_url}}"
+
+      - type: "Add comment"
+        comment: |
+          PR created: [{{webhook.pull_request.title}}|{{webhook.pull_request.html_url}}]
+          By: {{webhook.pull_request.user.login}}
+
+      - type: "Transition issue"
+        transition: "Submit PR"
+
+      - type: "Add label"
+        label: "has-pr"
+
+  # ==========================================================================
+  # RULE 8: Notify on Deployment
+  # ==========================================================================
+  - name: "Notify Stakeholders on Deployment"
+    id: "DEPLOYMENT_NOTIFY_001"
+    enabled: true
+
+    trigger:
+      type: "Issue transitioned"
+      to_status: "DEPLOYED"
+
+    actions:
+      - type: "Send email"
+        to: "{{issue.reporter}}, {{issue.Stakeholder List}}"
+        subject: "Deployed: {{issue.key}}"
+        body: |
+          Your request {{issue.key}} has been deployed to production.
+
+          Summary: {{issue.summary}}
+          Deployed at: {{now}}
+
+          Please verify it's working as expected.
+
+      # Post to Slack (requires webhook)
+      - type: "Send web request"
+        url: "{{slack.webhook.url}}"
+        method: "POST"
+        body: |
+          {
+            "text": "🚀 Deployed: {{issue.key}} - {{issue.summary}}"
+          }
+
+  # ==========================================================================
+  # RULE 9: QA Failure Rollback
+  # ==========================================================================
+  - name: "Rollback to Dev on QA Failure"
+    id: "QA_ROLLBACK_001"
+    enabled: true
+
+    trigger:
+      type: "Field value changed"
+      field: "Test Results"
+      new_value: "Fail"
+
+    conditions:
+      - type: "Issue fields condition"
+        field: "Status"
+        condition: "equals QA_TESTING"
+
+    actions:
+      - type: "Transition issue"
+        transition: "QA Fail → Dev"
+
+      - type: "Add comment"
+        comment: |
+          ❌ QA Failed
+
+          Test failures detected. Rolling back to development.
+
+          Please review and fix the issues.
+
+      - type: "Edit issue"
+        field: "Assignee"
+        value: "{{issue.Previous Assignee}}"
+
+      - type: "Increment field"
+        field: "QA Failure Count"
+
+setup_instructions: |
+  For each rule above:
+
+  1. Go to: Project Settings → Automation
+  2. Click "Create rule"
+  3. Configure trigger, conditions, and actions as specified
+  4. Enable the rule
+  5. Test with a dummy ticket
+
+  Note: Some actions may require JIRA apps or webhooks to be configured first.

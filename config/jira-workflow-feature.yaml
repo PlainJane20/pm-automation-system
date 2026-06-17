@@ -1,0 +1,221 @@
+# Feature Development Workflow
+# For Features and Enhancements (requires BRD approval)
+
+name: "Feature Development Workflow"
+description: "Workflow for new features and enhancements with BRD governance"
+
+statuses:
+  - name: "SUBMITTED"
+    category: "TO_DO"
+    description: "Initial submission, needs triage"
+
+  - name: "AWAITING_SCOPING"
+    category: "TO_DO"
+    description: "Needs Business Requirements Document (BRD)"
+
+  - name: "SCOPING_IN_PROGRESS"
+    category: "IN_PROGRESS"
+    description: "BRD is being written"
+
+  - name: "AWAITING_APPROVAL"
+    category: "TO_DO"
+    description: "BRD ready, awaiting stakeholder approval"
+
+  - name: "APPROVED"
+    category: "TO_DO"
+    description: "BRD approved, ready for roadmap prioritization"
+
+  - name: "BACKLOG"
+    category: "TO_DO"
+    description: "Prioritized for future sprint"
+
+  - name: "READY_FOR_DEV"
+    category: "TO_DO"
+    description: "In sprint backlog, ready to start"
+
+  - name: "IN_PROGRESS"
+    category: "IN_PROGRESS"
+    description: "Development in progress"
+
+  - name: "CODE_REVIEW"
+    category: "IN_PROGRESS"
+    description: "Pull request submitted for review"
+
+  - name: "QA_TESTING"
+    category: "IN_PROGRESS"
+    description: "In QA validation"
+
+  - name: "UAT"
+    category: "IN_PROGRESS"
+    description: "User acceptance testing"
+
+  - name: "READY_FOR_DEPLOY"
+    category: "TO_DO"
+    description: "Approved for deployment"
+
+  - name: "DEPLOYED"
+    category: "DONE"
+    description: "Deployed to production"
+
+  - name: "VERIFIED"
+    category: "DONE"
+    description: "Verified working in production"
+
+  - name: "CLOSED"
+    category: "DONE"
+    description: "Completed and closed"
+
+  - name: "REJECTED"
+    category: "DONE"
+    description: "Not approved for implementation"
+
+  - name: "ABANDONED"
+    category: "DONE"
+    description: "Cancelled after approval"
+
+transitions:
+  # Intake flow
+  - name: "Start Triage"
+    from: ["SUBMITTED"]
+    to: "AWAITING_SCOPING"
+
+  - name: "Assign BRD Owner"
+    from: ["AWAITING_SCOPING"]
+    to: "SCOPING_IN_PROGRESS"
+    validators:
+      - field: "BRD Owner"
+        condition: "is not empty"
+
+  - name: "Submit for Approval"
+    from: ["SCOPING_IN_PROGRESS"]
+    to: "AWAITING_APPROVAL"
+    validators:
+      - field: "BRD Document Link"
+        condition: "is not empty"
+        error_message: "BRD Document Link is required"
+      - field: "Stakeholder List"
+        condition: "has at least 2 users"
+        error_message: "Minimum 2 stakeholders required"
+    post_functions:
+      - action: "Send approval requests to stakeholders"
+      - action: "Set approval deadline to +5 business days"
+
+  # Approval flow
+  - name: "Approve"
+    from: ["AWAITING_APPROVAL"]
+    to: "APPROVED"
+    condition: "All stakeholders have approved"
+    validators:
+      - field: "Effort Estimate (Story Points)"
+        condition: "is not empty"
+    post_functions:
+      - action: "Set BRD Approved Date to current date"
+      - action: "Add comment: BRD approved, ready for roadmap"
+      - action: "Notify requestor of approval"
+
+  - name: "Reject"
+    from: ["AWAITING_APPROVAL"]
+    to: "REJECTED"
+    condition: "Any stakeholder rejected"
+    post_functions:
+      - action: "Add comment with rejection reason"
+      - action: "Notify requestor"
+
+  - name: "Send Back for Revision"
+    from: ["AWAITING_APPROVAL"]
+    to: "SCOPING_IN_PROGRESS"
+
+  # Development flow
+  - name: "Add to Backlog"
+    from: ["APPROVED"]
+    to: "BACKLOG"
+
+  - name: "Plan for Sprint"
+    from: ["BACKLOG", "APPROVED"]
+    to: "READY_FOR_DEV"
+    validators:
+      - field: "Epic Link"
+        condition: "is not empty"
+        error_message: "Must link to Epic for traceability"
+
+  # CRITICAL GATE: BRD Required Before Development
+  - name: "Start Development"
+    from: ["READY_FOR_DEV"]
+    to: "IN_PROGRESS"
+    validators:
+      - field: "BRD Approved Date"
+        condition: "is not empty"
+        error_message: "⛔ Development cannot start without approved BRD"
+      - field: "Assignee"
+        condition: "is not empty"
+        error_message: "Must assign to a developer"
+    post_functions:
+      - action: "Start SLA timer"
+      - action: "Post to Slack: Development started"
+
+  - name: "Submit PR"
+    from: ["IN_PROGRESS"]
+    to: "CODE_REVIEW"
+    validators:
+      - field: "PR Link"
+        condition: "is not empty"
+
+  - name: "Send to QA"
+    from: ["CODE_REVIEW"]
+    to: "QA_TESTING"
+    condition: "PR is merged"
+    post_functions:
+      - action: "Assign to QA engineer"
+      - action: "Notify QA team"
+
+  - name: "QA Pass → UAT"
+    from: ["QA_TESTING"]
+    to: "UAT"
+    validators:
+      - field: "Test Results"
+        condition: "equals Pass"
+
+  - name: "QA Fail → Dev"
+    from: ["QA_TESTING"]
+    to: "IN_PROGRESS"
+    condition: "Test Results = Fail"
+    post_functions:
+      - action: "Reassign to original developer"
+      - action: "Increment QA Failure Count"
+
+  - name: "UAT Pass → Deploy"
+    from: ["UAT"]
+    to: "READY_FOR_DEPLOY"
+    validators:
+      - field: "UAT Sign-off"
+        condition: "is not empty"
+
+  - name: "Deploy"
+    from: ["READY_FOR_DEPLOY"]
+    to: "DEPLOYED"
+    post_functions:
+      - action: "Post to Slack #engineering-deploys"
+      - action: "Set deployment timestamp"
+
+  - name: "Verify"
+    from: ["DEPLOYED"]
+    to: "VERIFIED"
+    validators:
+      - field: "Smoke Test Results"
+        condition: "equals Pass"
+
+  - name: "Close"
+    from: ["VERIFIED"]
+    to: "CLOSED"
+    post_functions:
+      - action: "Notify requestor"
+      - action: "Calculate cycle time metrics"
+
+setup_instructions: |
+  1. Go to JIRA Settings → Issues → Workflows
+  2. Click "Add workflow"
+  3. Name: "Feature Development Workflow"
+  4. Add statuses from the list above
+  5. Create transitions with validators and post-functions
+  6. Associate workflow with "Feature" and "Enhancement" issue types
+  7. Publish the workflow

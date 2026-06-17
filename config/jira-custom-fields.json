@@ -1,0 +1,85 @@
+{
+  "custom_fields": [
+    {
+      "name": "Request Type",
+      "type": "select",
+      "description": "Classification of the request",
+      "options": [
+        "Bug",
+        "Feature",
+        "Enhancement",
+        "Support Request"
+      ],
+      "required": true,
+      "default": "Feature"
+    },
+    {
+      "name": "BRD Document Link",
+      "type": "url",
+      "description": "Link to approved Business Requirements Document (Google Docs or Confluence)",
+      "required_for_states": ["READY_FOR_DEV", "IN_PROGRESS"],
+      "validation": "Must be a valid URL to Google Docs or Confluence"
+    },
+    {
+      "name": "BRD Owner",
+      "type": "user",
+      "description": "Person responsible for creating the BRD",
+      "required_for_states": ["SCOPING_IN_PROGRESS"]
+    },
+    {
+      "name": "BRD Approved Date",
+      "type": "date",
+      "description": "Date when BRD was approved by stakeholders",
+      "auto_populated": true,
+      "required_for_transition": "READY_FOR_DEV -> IN_PROGRESS"
+    },
+    {
+      "name": "Stakeholder List",
+      "type": "multiuser",
+      "description": "RACI stakeholders who need to approve this work",
+      "required_for_states": ["AWAITING_APPROVAL"]
+    },
+    {
+      "name": "Epic Link",
+      "type": "epic_link",
+      "description": "Link to parent Epic for program-level tracking",
+      "required_for_states": ["READY_FOR_DEV", "IN_PROGRESS"],
+      "note": "This is a built-in JIRA field - just enable it in Field Configuration"
+    },
+    {
+      "name": "PR Link",
+      "type": "url",
+      "description": "GitHub Pull Request URL",
+      "auto_populated": true,
+      "populated_by": "GitHub webhook"
+    },
+    {
+      "name": "Test Results",
+      "type": "select",
+      "description": "QA test execution results",
+      "options": ["Pass", "Fail", "In Progress", "Blocked"],
+      "required_for_states": ["QA_TESTING"]
+    },
+    {
+      "name": "Story Points",
+      "type": "number",
+      "description": "Effort estimation in story points",
+      "required_for_states": ["APPROVED"]
+    },
+    {
+      "name": "Technical Risk",
+      "type": "select",
+      "description": "Technical complexity and risk level",
+      "options": ["Low", "Medium", "High"],
+      "required_for_states": ["AWAITING_APPROVAL"]
+    }
+  ],
+
+  "setup_instructions": {
+    "step_1": "Go to JIRA Settings (⚙️) → Issues → Custom fields",
+    "step_2": "Click 'Create custom field'",
+    "step_3": "For each field above, select the appropriate type and configure options",
+    "step_4": "Add the field to your project's Field Configuration",
+    "step_5": "Associate fields with appropriate screens (Create, Edit, View)"
+  }
+}

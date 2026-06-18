@@ -11,6 +11,7 @@ from datetime import datetime
 
 from app.webhooks import router as webhooks_router
 from app.api.routes import router as api_router
+from app.api.setup_routes import router as setup_router
 from app.db.database import init_db
 
 # Configure logging
@@ -54,6 +55,7 @@ app.add_middleware(
 # Include routers
 app.include_router(webhooks_router, prefix="/webhooks", tags=["webhooks"])
 app.include_router(api_router, prefix="/api", tags=["api"])
+app.include_router(setup_router, tags=["setup"])
 
 
 @app.get("/")

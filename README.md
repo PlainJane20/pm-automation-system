@@ -1,438 +1,309 @@
-# PM Automation System
+# PMO Automation System - End-to-End
 
-**End-to-end program management automation with strict governance guardrails**
+**Complete program management automation from stakeholder intake → roadmap → scoping → sprint execution**
 
 Built by: Navi Sohi, Staff TPM  
-Purpose: Eliminate manual overhead, ensure process compliance, maintain data hygiene
+Purpose: Automate strategic planning, enforce governance, eliminate manual overhead  
+Status: **Phase 1 Complete ✅ | Phases 2-4 Planned 📋**
 
 ---
 
 ## 🎯 What This System Does
 
-This is a **complete automation platform** that transforms chaotic program management into a structured, governed, data-driven process:
+This is a **complete PMO automation platform** that creates a structured pipeline from business request to delivered software:
 
-✅ **BRD Gate Enforcement** - Prevents development from starting without approved requirements  
-✅ **Auto-Classification** - AI-powered ticket categorization (Bug vs Feature)  
-✅ **Duplicate Detection** - Flags similar tickets to prevent redundant work  
-✅ **Stale Ticket Cleanup** - Auto-closes inactive tickets after 60 days  
-✅ **Real-time Dashboards** - Executive-ready metrics without manual reporting  
-✅ **Slack/Email Integration** - Automated status updates and notifications  
+### ✅ Phase 1: Epic Intake Automation (COMPLETE)
+- **Stakeholder Intake:** Google Form → Auto-creates JIRA Epics when approved
+- **Auto-Sync Fields:** Priority, Due Date, Request Type, Labels (Sheet → JIRA)
+- **BRD Gate:** Prevents Story transitions without complete requirements
+- **One-Way Sync:** Google Sheet controls JIRA (not bidirectional)
+
+### 📋 Phase 2: Epic Workflow & Roadmap (PLANNED)
+- **Epic Lifecycle:** INTAKE → UNDER_REVIEW → BACKLOG → IN_ROADMAP → IN_EXECUTION → COMPLETED
+- **Roadmap Board:** Now/Next/Later visualization by quarter
+- **Capacity Planning:** Track team capacity vs. committed Epics
+- **Auto-Notifications:** Stakeholder alerts at each Epic status change
+
+### 📋 Phase 3: Story-Level BRD Workflow (PLANNED)
+- **Story Breakdown:** Guided process to split Epics into Stories
+- **BRD Template:** User Story, Acceptance Criteria, Technical Approach
+- **Definition of Ready:** Enforce checklist before sprint commitment
+- **Enhanced BRD Gate:** Block Story transitions without complete BRD
+
+### 📋 Phase 4: Sprint Execution & Metrics (PLANNED)
+- **Sprint Planning:** Auto-populate backlog from READY_FOR_DEV Stories
+- **Daily Standup:** Slack summary of progress, blockers, burndown
+- **Velocity Tracking:** Team performance trends, predictability scores
+- **Metrics Dashboard:** Real-time burndown, Epic progress, roadmap status
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                       INTAKE LAYER                           │
-│    Slack │ Email │ Web Forms │ JIRA Portal                  │
-└───────────────────────┬─────────────────────────────────────┘
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   JIRA (Single Source of Truth)              │
-│   Workflows │ Custom Fields │ Native Automation             │
-└───────────────────────┬─────────────────────────────────────┘
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────────────┐
-│              AUTOMATION MIDDLEWARE (FastAPI)                 │
-│   • BRD Gate Enforcement                                     │
-│   • AI Classification                                        │
-│   • Duplicate Detection                                      │
-│   • Stale Cleanup                                            │
-│   • Metrics Tracking                                         │
-└───────────────────────┬─────────────────────────────────────┘
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  INTEGRATIONS & OUTPUTS                      │
-│   Slack │ GitHub │ Email │ Dashboards │ Reports             │
-└─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│                   STRATEGIC LAYER (Epic Level)                 │
+│                                                                │
+│  Stakeholder → Google Form → Google Sheet → JIRA Epic         │
+│                      ↓                                         │
+│              IT Leadership Review                              │
+│                      ↓                                         │
+│         Approve → Roadmap (Now/Next/Later)                     │
+└────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌────────────────────────────────────────────────────────────────┐
+│                   TACTICAL LAYER (Story Level)                 │
+│                                                                │
+│       Epic → Stories → BRD Process → READY_FOR_DEV             │
+│                      ↓                                         │
+│              Sprint Backlog Queue                              │
+└────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌────────────────────────────────────────────────────────────────┐
+│                  OPERATIONAL LAYER (Sprint Level)              │
+│                                                                │
+│  Sprint Planning → Daily Execution → Sprint Review/Retro      │
+│                      ↓                                         │
+│          Velocity Tracking, Burndown Charts                    │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🚀 Quick Start (30 Minutes to Operational)
+## 📦 Components
 
-### Prerequisites
+### Current (Phase 1)
+| Component | Technology | Purpose | Status |
+|-----------|-----------|---------|--------|
+| **Intake Form** | Google Forms | Stakeholder submissions | ✅ Live |
+| **Review Sheet** | Google Sheets | IT Leadership assessment | ✅ Live |
+| **Epic Creator** | Google Apps Script | Auto-create JIRA Epics | ✅ Live |
+| **Field Sync** | Google Apps Script | Sheet → JIRA updates | ✅ Live |
+| **BRD Gate** | Railway (Node.js) | Block transitions without BRD | ✅ Live |
+| **JIRA Project** | JIRA Cloud | Project management | ✅ Live |
 
-- **JIRA Free Account** (up to 10 users) - [Sign up here](https://www.atlassian.com/software/jira/free)
-- **Python 3.11+** installed
-- **GitHub account** (for version control)
-- **Railway.app account** (for free hosting) - [Sign up here](https://railway.app)
-
-### Step 1: Set Up JIRA (10 minutes)
-
-1. **Create JIRA account** at atlassian.com/software/jira/free
-2. **Create your first project**:
-   - Template: Kanban
-   - Name: "Pilot Program"
-   - Key: `PILOT`
-
-3. **Add custom fields** (Settings → Issues → Custom fields):
-   - Copy configurations from [`config/jira-custom-fields.json`](config/jira-custom-fields.json)
-   - Create these fields:
-     - Request Type (select list)
-     - BRD Document Link (URL)
-     - BRD Owner (user picker)
-     - BRD Approved Date (date picker)
-
-4. **Configure workflow**:
-   - Use the template from [`config/jira-workflow-feature.yaml`](config/jira-workflow-feature.yaml)
-   - Add these statuses: SUBMITTED → AWAITING_SCOPING → SCOPING_IN_PROGRESS → READY_FOR_DEV → IN_PROGRESS → QA_TESTING → DONE
-
-5. **Get API token**:
-   - Go to: https://id.atlassian.com/manage/api-tokens
-   - Click "Create API token"
-   - Save it securely
-
-### Step 2: Deploy Automation Middleware (10 minutes)
-
-1. **Clone this repository**:
-   ```bash
-   git clone <your-repo-url>
-   cd pm-automation-system
-   ```
-
-2. **Create `.env` file**:
-   ```bash
-   cp .env.example .env
-   ```
-
-3. **Edit `.env` with your JIRA credentials**:
-   ```bash
-   JIRA_URL=https://yourcompany.atlassian.net
-   JIRA_EMAIL=your-email@company.com
-   JIRA_API_TOKEN=your_jira_api_token
-   JIRA_PROJECT_KEY=PILOT
-   ```
-
-4. **Deploy to Railway** (free tier):
-
-   [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new)
-
-   - Connect your GitHub repo
-   - Railway auto-detects Dockerfile
-   - Add environment variables from `.env`
-   - Click "Deploy"
-   - Copy your deployment URL (e.g., `https://pm-automation-production.up.railway.app`)
-
-   **Alternative: Run locally**:
-   ```bash
-   pip install -r requirements.txt
-   uvicorn app.main:app --reload
-   # Access at: http://localhost:8000
-   ```
-
-### Step 3: Connect JIRA to Middleware (5 minutes)
-
-1. **Configure webhooks** in JIRA:
-   - Go to: Settings → System → WebHooks
-   - Click "Create a WebHook"
-
-2. **Add webhook for "Issue Created"**:
-   - Name: `PM Automation - Issue Created`
-   - URL: `https://your-railway-url.up.railway.app/webhooks/jira/issue-created`
-   - Events: ✅ Issue Created
-   - Click "Create"
-
-3. **Add webhook for "Issue Updated"**:
-   - Name: `PM Automation - Issue Transitioned`
-   - URL: `https://your-railway-url.up.railway.app/webhooks/jira/issue-transitioned`
-   - Events: ✅ Issue Updated
-   - Click "Create"
-
-### Step 4: Add JIRA Automation Rules (5 minutes)
-
-1. Go to: **Project Settings → Automation**
-2. Click "Create rule"
-3. **Copy rules from** [`config/jira-automation-rules.yaml`](config/jira-automation-rules.yaml)
-
-**Most Critical Rule to Add First: BRD Gate Enforcement**
-
-- Trigger: Issue transitioned → to "IN_PROGRESS"
-- Condition: BRD Approved Date is empty
-- Action: Block issue transition with error message
+### Planned (Phases 2-4)
+| Component | Technology | Purpose | Status |
+|-----------|-----------|---------|--------|
+| **Epic Workflow** | JIRA Automation | Status transitions, notifications | 📋 Planned |
+| **Roadmap Board** | JIRA Kanban | Now/Next/Later visualization | 📋 Planned |
+| **Story Templates** | JIRA Templates | BRD structure enforcement | 📋 Planned |
+| **Sprint Automation** | JIRA Automation | Auto-populate sprint backlog | 📋 Planned |
+| **Slack Bot** | Slack API | Daily standup summaries | 📋 Planned |
+| **Metrics Dashboard** | JIRA Dashboards | Real-time velocity, burndown | 📋 Planned |
 
 ---
 
-## 📊 Access Your Dashboard
+## 🚀 Quick Start
 
-Once deployed, access these endpoints:
+### For Phase 1 (Current)
+See: **[SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md)** for step-by-step deployment.
 
-- **Health Check**: `https://your-url/health`
-- **Program Health**: `https://your-url/api/program-health?project=PILOT`
-- **Velocity Trends**: `https://your-url/api/velocity?project=PILOT`
-- **Stale Tickets**: `https://your-url/api/stale-tickets`
-- **Automation Stats**: `https://your-url/api/automation-stats`
+**Summary:**
+1. Create JIRA project with Request Type custom field
+2. Deploy Google Form + Sheet
+3. Install Google Apps Script with JIRA credentials
+4. Create installable trigger (On edit)
+5. Test Epic creation
 
-### Google Sheets Dashboard (Free Alternative to Tableau)
-
-See [`docs/google-sheets-dashboard.md`](docs/google-sheets-dashboard.md) for instructions on creating a real-time dashboard in Google Sheets.
-
----
-
-## 🧪 Test Your Setup
-
-1. **Create a test ticket** in JIRA:
-   - Summary: "Test feature request"
-   - Request Type: (leave empty to test auto-classification)
-
-2. **Check automation worked**:
-   - Ticket should auto-classify as "Feature"
-   - Label "auto-classified" should be added
-   - Check Railway logs to see webhook received
-
-3. **Test BRD gate**:
-   - Try to transition ticket to "IN_PROGRESS" without filling BRD fields
-   - Should be blocked with error message ✅
+### For Phases 2-4 (Future)
+See: **[FULL_PMO_ROADMAP.md](FULL_PMO_ROADMAP.md)** for implementation plan.
 
 ---
 
-## 📚 Documentation
+## 📋 Documentation
 
-- **[Setup Guide](docs/SETUP.md)** - Detailed step-by-step setup
-- **[User Guide](docs/USER_GUIDE.md)** - How to use the system
-- **[API Documentation](docs/API.md)** - API endpoints reference
-- **[Automation Rules](config/jira-automation-rules.yaml)** - All automation rules explained
-- **[Architecture](docs/ARCHITECTURE.md)** - Technical deep dive
+### Core Docs
+- **[FULL_PMO_ROADMAP.md](FULL_PMO_ROADMAP.md)** - Complete end-to-end vision, Phases 1-4
+- **[COMPLETED_PHASE1.md](COMPLETED_PHASE1.md)** - Phase 1 full documentation
+- **[SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md)** - Phase 1 deployment guide
+- **[SYSTEM_SUMMARY.md](SYSTEM_SUMMARY.md)** - Technical architecture
+
+### Configuration Files
+- **[google-apps-script-COMPLETE-WITH-REQUEST-TYPE.txt](google-apps-script-COMPLETE-WITH-REQUEST-TYPE.txt)** - Apps Script source code
+- **[config/jira-custom-fields.json](config/jira-custom-fields.json)** - JIRA field definitions
+- **[.env.example](.env.example)** - Environment variables template
+
+### Additional Docs
+- **[IT_Project_Intake_Form_MVP.md](IT_Project_Intake_Form_MVP.md)** - Intake form questions
+- **[DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)** - Railway deployment checklist
+- **[docs/QUICKSTART.md](docs/QUICKSTART.md)** - Quick reference guide
 
 ---
 
-## 🛠️ Configuration
+## 🎯 Use Cases
 
-### Environment Variables
+### Strategic Planning (Executives/TPMs)
+- **Roadmap Visualization:** See all approved initiatives by quarter
+- **Capacity Planning:** Avoid over-commitment, balance workload
+- **Stakeholder Communication:** Automated status updates reduce noise
 
-All configuration is managed via `.env` file:
+### Requirements Definition (BAs/Product Owners)
+- **BRD Enforcement:** No development without clear acceptance criteria
+- **Story Templates:** Consistent structure across all teams
+- **Definition of Ready:** Checklist ensures dev-ready Stories
 
+### Sprint Execution (Scrum Masters/Developers)
+- **Sprint Planning:** Auto-populated backlog based on READY_FOR_DEV queue
+- **Daily Standup:** Slack summaries replace manual status updates
+- **Velocity Tracking:** Data-driven capacity forecasting
+
+---
+
+## 📊 Success Metrics
+
+### Phase 1 (Current)
+- **Intake Time:** 5 minutes (down from 15 minutes manual JIRA entry)
+- **Epic Creation:** 10 seconds automated (vs. 5-10 minutes manual)
+- **Data Accuracy:** 100% (no manual transcription errors)
+- **Epics Created:** 4 production Epics (PGMAUTO-1 to PGMAUTO-4)
+
+### Phases 2-4 (Targets)
+- **Backlog Prioritization:** 30 minutes per quarter (vs. 2 hours manual)
+- **BRD Completion:** 2 hours per Story (down from 4 hours)
+- **Sprint Predictability:** 85% of committed Stories completed
+- **Velocity Variance:** <15% sprint-to-sprint
+- **Time to Metrics:** Real-time (vs. weekly manual reports)
+
+---
+
+## 🔧 Technology Stack
+
+### Current
+- **Frontend:** Google Forms (intake), Google Sheets (review)
+- **Automation:** Google Apps Script
+- **Project Management:** JIRA Cloud (Scrum template)
+- **Middleware:** Railway (Node.js/Express) - BRD gate
+- **API:** JIRA REST API v3
+
+### Planned
+- **Workflow:** JIRA Automation (native rules engine)
+- **Notifications:** Slack API
+- **Metrics/BI:** JIRA Dashboards (or Tableau/Power BI)
+- **Documentation:** Confluence (sprint reviews, retros)
+
+---
+
+## 🔐 Security
+
+### Current Implementation
+- ✅ JIRA API token stored in Google Apps Script (encrypted at rest)
+- ✅ Google Sheet access restricted to IT Leadership
+- ✅ Form submissions logged with timestamp + email
+- ✅ `.env` file in `.gitignore` (credentials never committed)
+
+### Planned Enhancements
+- [ ] Rotate API tokens every 90 days
+- [ ] Service account for automation (avoid personal tokens)
+- [ ] Audit log for all Epic/Story status changes
+- [ ] GDPR compliance: Right to delete form submissions
+
+---
+
+## 📈 Production URLs
+
+### Phase 1 (Live)
+- **Google Form:** https://forms.gle/w3nfUnipveyAhxss5
+- **Google Sheet:** https://docs.google.com/spreadsheets/d/158zDAbms5TR7rIJeTfG6o9FpMDlz3AY2HpYqcizLVtQ/edit
+- **JIRA Project:** https://nksaidev.atlassian.net/jira/software/projects/PGMAUTO
+- **Railway BRD Gate:** https://pm-automation-system-production.up.railway.app
+
+---
+
+## 🛠️ Development
+
+### Local Setup
 ```bash
-# Required
-JIRA_URL=https://yourcompany.atlassian.net
-JIRA_EMAIL=your-email@company.com
-JIRA_API_TOKEN=your_token
-JIRA_PROJECT_KEY=PILOT
+# Clone repo
+git clone https://github.com/[your-username]/pm-automation-system.git
+cd pm-automation-system
 
-# Optional - AI Features
-OPENAI_API_KEY=sk-...
-ENABLE_AI_CLASSIFICATION=true
+# Install dependencies (for Railway middleware)
+pip install -r requirements.txt
 
-# Optional - Slack
-SLACK_BOT_TOKEN=xoxb-...
-SLACK_NOTIFICATIONS_CHANNEL=#program-status
-ENABLE_SLACK_NOTIFICATIONS=true
+# Copy environment template
+cp .env.example .env
 
-# Optional - Database (defaults to SQLite)
-DATABASE_URL=sqlite+aiosqlite:///./pm_automation.db
+# Edit .env with your JIRA credentials
+nano .env
+
+# Run locally (Railway middleware only)
+uvicorn app.main:app --reload
 ```
 
-### Automation Rules Configuration
-
-Edit these values in `.env`:
-
-```bash
-STALE_TICKET_DAYS=60                    # Days before auto-close
-SLA_CHECK_INTERVAL_MINUTES=30           # How often to check SLAs
-DUPLICATE_SIMILARITY_THRESHOLD=0.8      # 0-1, higher = more strict
-```
+### Google Apps Script Development
+1. Open Google Sheet
+2. Extensions → Apps Script
+3. Edit `google-apps-script-COMPLETE-WITH-REQUEST-TYPE.txt`
+4. Save and test with `setup()` function
 
 ---
 
-## 🔥 Key Features
+## 🗺️ Roadmap
 
-### 1. BRD Gate Enforcement (Most Critical)
+| Phase | Timeline | Status |
+|-------|----------|--------|
+| **Phase 1: Epic Intake** | ✅ Complete (June 2026) | Production |
+| **Phase 2: Epic Workflow & Roadmap** | Q3 2026 (2 weeks) | Planned |
+| **Phase 3: Story BRD Workflow** | Q3-Q4 2026 (3 weeks) | Planned |
+| **Phase 4: Sprint Execution & Metrics** | Q4 2026 (4 weeks) | Planned |
 
-**Problem:** Development starts before requirements are clear, leading to rework  
-**Solution:** Hard gate that prevents "IN_PROGRESS" transition without approved BRD
+**Total Timeline:** 9-10 weeks (with testing & rollout)
 
-**How it works:**
-- Ticket must have `BRD Document Link` populated
-- Ticket must have `BRD Approved Date` set
-- Bugs/Support Requests bypass this gate (only applies to Features/Enhancements)
-- Violation attempts are blocked + logged + alerted
-
-### 2. Auto-Classification (AI-Powered)
-
-**Problem:** Tickets incorrectly categorized, wrong workflow applied  
-**Solution:** AI analyzes title + description, classifies as Bug/Feature/Enhancement/Support
-
-**How it works:**
-- If OpenAI API key configured: Uses GPT-4 for semantic understanding
-- Fallback: Keyword-based classification
-- Updates "Request Type" field automatically
-- Adds "auto-classified" label for tracking
-
-### 3. Duplicate Detection
-
-**Problem:** Multiple people request the same thing, wasting effort  
-**Solution:** Semantic similarity search flags potential duplicates
-
-**How it works:**
-- Searches last 90 days of open tickets
-- AI mode: Uses OpenAI embeddings for semantic similarity
-- Fallback: String similarity (Levenshtein distance)
-- Adds comment with links to similar tickets
-- Adds "potential-duplicate" label
-
-### 4. Stale Ticket Cleanup (Data Hygiene)
-
-**Problem:** Hundreds of abandoned tickets clutter the backlog  
-**Solution:** Auto-warns at 50 days, auto-closes at 60 days
-
-**How it works:**
-- Daily cron job scans for inactive tickets
-- Day 50: Adds warning comment + sends email
-- Day 60: Auto-closes + notifies reporter
-- Exceptions: P0/P1 tickets never auto-close
-
-### 5. Real-Time Metrics & Dashboards
-
-**Problem:** Status reports take 4 hours/week to create  
-**Solution:** Auto-generated metrics via API endpoints
-
-**Available Metrics:**
-- Program health score (0-100)
-- Tickets by status
-- Blocked tickets list
-- BRD compliance rate
-- Velocity trends (story points/week)
-- Cycle time analysis
-- Automation execution stats
+See **[FULL_PMO_ROADMAP.md](FULL_PMO_ROADMAP.md)** for detailed implementation plan.
 
 ---
 
-## 🔐 Security & Compliance
+## 🤝 Contributing
 
-- **API Authentication**: JIRA webhooks verified via signature
-- **Data Encryption**: All JIRA API calls use HTTPS + API tokens
-- **Audit Trail**: Every automation execution logged to database
-- **GDPR Compliant**: No PII stored outside JIRA
-- **Role-Based Access**: Inherits JIRA permission scheme
+We welcome contributions for Phases 2-4 implementation!
 
----
+**To contribute:**
+1. Fork the repo
+2. Create feature branch: `git checkout -b phase2-roadmap-board`
+3. Implement with tests
+4. Submit PR with:
+   - Implementation guide (`PHASE_X_SETUP.md`)
+   - Configuration files (JSON)
+   - Test results (screenshots)
 
-## 💰 Cost Breakdown
-
-**Total Monthly Cost: $0-15**
-
-| Service | Cost | Usage |
-|---------|------|-------|
-| JIRA Free | $0 | Up to 10 users, 2GB storage |
-| Railway Free Tier | $0 | 500 hours/month compute |
-| Google Sheets Dashboard | $0 | Unlimited |
-| OpenAI API (optional) | ~$5/month | ~5,000 tickets/month |
-| **TOTAL** | **$0-5/month** | |
-
-**To scale to 50 users:**
-- JIRA Standard: $7.75/user/month = $387.50
-- Railway Hobby Plan: $5/month
-- **Total: ~$393/month** for 50 users
-
----
-
-## 📈 Expected ROI
-
-Based on a 10-person TPM/PM team:
-
-| Manual Process | Time Before | Time After | Savings |
-|----------------|-------------|------------|---------|
-| Weekly status reports | 4 hrs | 30 min | **3.5 hrs/week** |
-| Duplicate request cleanup | 2 hrs | 0 hrs | **2 hrs/week** |
-| Stale ticket grooming | 3 hrs | 0 hrs | **3 hrs/week** |
-| BRD compliance tracking | 2 hrs | 0 hrs | **2 hrs/week** |
-| **TOTAL** | **11 hrs/week** | **30 min/week** | **10.5 hrs/week** |
-
-**Annual savings:**
-- 10.5 hrs/week × 50 weeks = **525 hours/year**
-- At $100/hour TPM rate = **$52,500/year saved**
-- Cost of system: **$393/month × 12 = $4,716/year**
-- **Net ROI: $47,784/year (10x return)**
-
----
-
-## 🧪 Testing
-
-Run automated tests:
-
-```bash
-pytest tests/ -v
-```
-
-Test coverage:
-- Webhook handlers
-- Automation rules logic
-- JIRA API client
-- Database operations
-
----
-
-## 🚧 Roadmap
-
-### Phase 1: MVP ✅ (Complete)
-- [x] BRD gate enforcement
-- [x] Auto-classification
-- [x] Duplicate detection
-- [x] Stale cleanup
-- [x] Basic API endpoints
-
-### Phase 2: Integrations (Next 30 days)
-- [ ] Slack bot for ticket creation
-- [ ] GitHub PR auto-linking
-- [ ] Email intake automation
-- [ ] Google Sheets dashboard template
-
-### Phase 3: Advanced Features (Next 90 days)
-- [ ] AI-powered BRD generation from meeting notes
-- [ ] Predictive risk scoring
-- [ ] Automated sprint planning suggestions
-- [ ] Resource allocation optimizer
-
----
-
-## 🐛 Troubleshooting
-
-### Webhooks not triggering
-
-1. Check Railway logs: `railway logs`
-2. Verify webhook URL in JIRA is correct
-3. Test webhook manually: `curl -X POST https://your-url/webhooks/jira/issue-created`
-
-### BRD gate not blocking transitions
-
-1. Verify automation rule is enabled in JIRA
-2. Check custom field "BRD Approved Date" exists and is mapped correctly
-3. Test with a ticket: leave BRD fields empty, try to move to IN_PROGRESS
-
-### Database errors
-
-- SQLite file permissions: `chmod 666 pm_automation.db`
-- PostgreSQL connection: verify `DATABASE_URL` format
+**Discussion:**
+- GitHub Issues: Feature requests & bugs
+- GitHub Discussions: Architecture decisions for future phases
 
 ---
 
 ## 📞 Support
 
-- **Issues**: Open a GitHub issue
-- **Questions**: Email your-email@company.com
-- **Slack**: #pm-automation (internal)
+### Maintainers
+- **Primary:** nks.ai.dev@gmail.com
+- **GitHub:** [your-repo]/pm-automation-system
+
+### Getting Help
+1. Check **[SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md)** for troubleshooting
+2. Search GitHub Issues for known problems
+3. Create new issue with:
+   - Phase number (1, 2, 3, or 4)
+   - Error message or unexpected behavior
+   - Steps to reproduce
 
 ---
 
-## 📝 License
+## 📄 License
 
-Proprietary - Navi Sohi (Staff TPM)
+MIT License - See [LICENSE](LICENSE) file for details.
 
 ---
 
 ## 🙏 Acknowledgments
 
-Built with:
-- [FastAPI](https://fastapi.tiangolo.com/) - Web framework
-- [JIRA Python API](https://jira.readthedocs.io/) - JIRA integration
-- [OpenAI API](https://platform.openai.com/) - AI features
-- [SQLAlchemy](https://www.sqlalchemy.org/) - Database ORM
+- **JIRA REST API v3** - For comprehensive project management API
+- **Google Apps Script** - For serverless automation platform
+- **Railway** - For simple middleware hosting
+- **Slack API** - For team communication integration (Phase 4)
 
 ---
 
-**Built with ❤️ by Navi Sohi**  
-*Staff Technical Program Manager | Lean Six Sigma Black Belt | Automation Advocate*
+**Built with ❤️ by Navi Sohi**

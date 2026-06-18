@@ -1,0 +1,642 @@
+/**
+ * Google Apps Script - JIRA Epic Auto-Creation with Auto-Update
+ *
+ * This script automatically:
+ * - Creates JIRA Epics when intake requests are approved
+ * - Updates JIRA Epic fields when Google Sheet is edited
+ *
+ * SETUP INSTRUCTIONS:
+ * 1. Open your Google Sheet with intake responses
+ * 2. Go to: Extensions → Apps Script
+ * 3. Delete any default code
+ * 4. Paste this entire script
+ * 5. Click Save
+ * 6. Run "setup" function once (authorize permissions)
+ * 7. Create installable trigger:
+ *    - Click Triggers (clock icon)
+ *    - Add Trigger
+ *    - Function: onEditInstallable
+ *    - Event: On edit
+ *    - Save
+ */
+
+// ========================================
+// CONFIGURATION
+// ========================================
+
+const CONFIG = {
+  JIRA_URL: 'https://nksaidev.atlassian.net',
+  JIRA_EMAIL: 'nks.ai.dev@gmail.com',
+  JIRA_API_TOKEN: '***JIRA_TOKEN_REMOVED***',
+  JIRA_PROJECT_KEY: 'PGMAUTO',
+
+  COLUMNS: {
+    TIMESTAMP: 0,
+    PROJECT_NAME: 1,
+    REQUEST_TYPE: 2,
+    DEPARTMENT: 3,
+    PROBLEM: 4,
+    IMPACT: 5,
+    DELIVERABLES: 6,
+    TARGET_DATE: 7,
+    PRIORITY: 8,
+    BUDGET: 9,
+    EMAIL: 10,
+    IT_RECOMMENDATION: 11,
+    ESTIMATED_EFFORT: 12,
+    TARGET_QUARTER: 13,
+    DECISION_DATE: 14,
+    JIRA_EPIC_LINK: 15,
+    IT_NOTES: 16
+  }
+};
+
+// ========================================
+// MAIN TRIGGER FUNCTION
+// ========================================
+
+function onEditInstallable(e) {
+  try {
+    const sheet = e.source.getActiveSheet();
+    const range = e.range;
+    const row = range.getRow();
+    const col = range.getColumn();
+
+    if (row <= 1) return;
+
+    const epicLink = sheet.getRange(row, CONFIG.COLUMNS.JIRA_EPIC_LINK + 1).getValue();
+
+    // SCENARIO 1: IT Recommendation changed to "Approve" - CREATE Epic
+    if (col === CONFIG.COLUMNS.IT_RECOMMENDATION + 1) {
+      const newValue = range.getValue();
+      if (newValue === 'Approve' && (!epicLink || epicLink.trim() === '')) {
+        createJiraEpicFromRow(sheet, row);
+        return;
+      }
+    }
+
+    // SCENARIO 2: Other fields changed and Epic exists - UPDATE Epic
+    if (epicLink && epicLink.trim() !== '') {
+      const epicKey = extractEpicKey(epicLink);
+
+      if (col === CONFIG.COLUMNS.PRIORITY + 1) {
+        updateJiraEpicPriority(epicKey, range.getValue());
+      } else if (col === CONFIG.COLUMNS.TARGET_DATE + 1) {
+        updateJiraEpicDueDate(epicKey, range.getValue());
+      } else if (col === CONFIG.COLUMNS.ESTIMATED_EFFORT + 1 ||
+                 col === CONFIG.COLUMNS.TARGET_QUARTER + 1) {
+        updateJiraEpicLabels(sheet, row, epicKey);
+      } else if (col === CONFIG.COLUMNS.PROBLEM + 1 ||
+                 col === CONFIG.COLUMNS.IMPACT + 1 ||
+                 col === CONFIG.COLUMNS.DELIVERABLES + 1) {
+        updateJiraEpicDescription(sheet, row, epicKey);
+      } else if (col === CONFIG.COLUMNS.IT_NOTES + 1) {
+        addJiraEpicComment(epicKey, range.getValue());
+      }
+    }
+  } catch (error) {
+    Logger.log('Error in onEditInstallable: ' + error.toString());
+    SpreadsheetApp.getUi().alert('Error: ' + error.toString());
+  }
+}
+
+// ========================================
+// JIRA EPIC CREATION
+// ========================================
+
+function createJiraEpicFromRow(sheet, row) {
+  const rowData = sheet.getRange(row, 1, 1, Object.keys(CONFIG.COLUMNS).length).getValues()[0];
+
+  const existingEpicLink = rowData[CONFIG.COLUMNS.JIRA_EPIC_LINK];
+  if (existingEpicLink && existingEpicLink.trim() !== '') {
+    Logger.log('Epic already exists for row ' + row + ': ' + existingEpicLink);
+    SpreadsheetApp.getUi().alert('Epic already created for this request:\n' + existingEpicLink);
+    return;
+  }
+
+  const projectName = rowData[CONFIG.COLUMNS.PROJECT_NAME];
+  const requestType = rowData[CONFIG.COLUMNS.REQUEST_TYPE];
+  const email = rowData[CONFIG.COLUMNS.EMAIL];
+  const department = rowData[CONFIG.COLUMNS.DEPARTMENT];
+  const problem = rowData[CONFIG.COLUMNS.PROBLEM];
+  const impact = rowData[CONFIG.COLUMNS.IMPACT];
+  const deliverables = rowData[CONFIG.COLUMNS.DELIVERABLES];
+  const targetDate = rowData[CONFIG.COLUMNS.TARGET_DATE];
+  const priority = rowData[CONFIG.COLUMNS.PRIORITY];
+  const budget = rowData[CONFIG.COLUMNS.BUDGET];
+  const estimatedEffort = rowData[CONFIG.COLUMNS.ESTIMATED_EFFORT];
+  const targetQuarter = rowData[CONFIG.COLUMNS.TARGET_QUARTER];
+  const itNotes = rowData[CONFIG.COLUMNS.IT_NOTES];
+  const timestamp = rowData[CONFIG.COLUMNS.TIMESTAMP];
+
+  const description = formatEpicDescription({
+    requestor: email,
+    department,
+    timestamp,
+    problem,
+    impact,
+    deliverables,
+    targetDate,
+    priority,
+    budget,
+    estimatedEffort,
+    targetQuarter,
+    itNotes,
+    sheetUrl: sheet.getParent().getUrl() + '#gid=' + sheet.getSheetId() + '&range=A' + row
+  });
+
+  // Map priority
+  const priorityMap = {
+    'P0 - Critical (Business-stopping issue, immediate action required)': 'Highest',
+    'P1 - High (Significant impact, needed within this quarter)': 'High',
+    'P2 - Medium (Important but can wait 1-2 quarters)': 'Medium',
+    'P3 - Low (Nice to have, no specific deadline)': 'Low'
+  };
+  const jiraPriority = priorityMap[priority] || 'Medium';
+
+  // Format due date
+  let formattedDueDate = null;
+  if (targetDate) {
+    if (targetDate instanceof Date) {
+      formattedDueDate = Utilities.formatDate(targetDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    } else {
+      formattedDueDate = targetDate;
+    }
+  }
+
+  // Create labels
+  const labels = [];
+  if (estimatedEffort) labels.push('Effort-' + estimatedEffort.replace(/\s/g, '-'));
+  if (targetQuarter) labels.push(targetQuarter.replace(/\s/g, '-'));
+
+  const epicPayload = {
+    fields: {
+      project: {
+        key: CONFIG.JIRA_PROJECT_KEY
+      },
+      summary: projectName,
+      description: description,
+      issuetype: {
+        name: 'Epic'
+      },
+      priority: {
+        name: jiraPriority
+      }
+    }
+  };
+
+  if (formattedDueDate) {
+    epicPayload.fields.duedate = formattedDueDate;
+  }
+
+  if (labels.length > 0) {
+    epicPayload.fields.labels = labels;
+  }
+
+  try {
+    const epic = createJiraIssue(epicPayload);
+
+    if (epic && epic.key) {
+      const epicUrl = CONFIG.JIRA_URL + '/browse/' + epic.key;
+
+      sheet.getRange(row, CONFIG.COLUMNS.JIRA_EPIC_LINK + 1).setValue(epicUrl);
+      sheet.getRange(row, CONFIG.COLUMNS.DECISION_DATE + 1).setValue(new Date());
+
+      SpreadsheetApp.getUi().alert(
+        'Success! Epic created:\n\n' +
+        'Epic Key: ' + epic.key + '\n' +
+        'URL: ' + epicUrl
+      );
+
+      Logger.log('Successfully created Epic: ' + epic.key);
+    }
+  } catch (error) {
+    Logger.log('Error creating Epic: ' + error.toString());
+    SpreadsheetApp.getUi().alert('Failed to create Epic:\n' + error.toString());
+  }
+}
+
+// ========================================
+// JIRA API FUNCTIONS
+// ========================================
+
+function createJiraIssue(payload) {
+  const url = CONFIG.JIRA_URL + '/rest/api/3/issue';
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'Authorization': 'Basic ' + Utilities.base64Encode(CONFIG.JIRA_EMAIL + ':' + CONFIG.JIRA_API_TOKEN)
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  const response = UrlFetchApp.fetch(url, options);
+  const responseCode = response.getResponseCode();
+  const responseBody = response.getContentText();
+
+  if (responseCode === 201) {
+    return JSON.parse(responseBody);
+  } else {
+    throw new Error('JIRA API Error (' + responseCode + '): ' + responseBody);
+  }
+}
+
+// ========================================
+// JIRA EPIC UPDATE FUNCTIONS
+// ========================================
+
+function extractEpicKey(epicLink) {
+  const match = epicLink.match(/([A-Z]+-\d+)/);
+  return match ? match[1] : null;
+}
+
+function updateJiraEpicPriority(epicKey, priority) {
+  if (!epicKey || !priority) return;
+
+  const priorityMap = {
+    'P0 - Critical (Business-stopping issue, immediate action required)': 'Highest',
+    'P1 - High (Significant impact, needed within this quarter)': 'High',
+    'P2 - Medium (Important but can wait 1-2 quarters)': 'Medium',
+    'P3 - Low (Nice to have, no specific deadline)': 'Low'
+  };
+
+  const jiraPriority = priorityMap[priority] || 'Medium';
+
+  const url = CONFIG.JIRA_URL + '/rest/api/3/issue/' + epicKey;
+  const payload = {
+    fields: {
+      priority: { name: jiraPriority }
+    }
+  };
+
+  updateJiraIssue(url, payload);
+  Logger.log('Updated Epic ' + epicKey + ' priority to ' + jiraPriority);
+  SpreadsheetApp.getUi().toast('Updated priority to ' + jiraPriority, 'Epic Updated', 3);
+}
+
+function updateJiraEpicDueDate(epicKey, dueDate) {
+  if (!epicKey || !dueDate) return;
+
+  const url = CONFIG.JIRA_URL + '/rest/api/3/issue/' + epicKey;
+
+  let formattedDate;
+  if (dueDate instanceof Date) {
+    formattedDate = Utilities.formatDate(dueDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  } else {
+    formattedDate = dueDate;
+  }
+
+  const payload = {
+    fields: {
+      duedate: formattedDate
+    }
+  };
+
+  updateJiraIssue(url, payload);
+  Logger.log('Updated Epic ' + epicKey + ' due date to ' + formattedDate);
+  SpreadsheetApp.getUi().toast('Updated due date to ' + formattedDate, 'Epic Updated', 3);
+}
+
+function updateJiraEpicLabels(sheet, row, epicKey) {
+  if (!epicKey) return;
+
+  const estimatedEffort = sheet.getRange(row, CONFIG.COLUMNS.ESTIMATED_EFFORT + 1).getValue();
+  const targetQuarter = sheet.getRange(row, CONFIG.COLUMNS.TARGET_QUARTER + 1).getValue();
+
+  const labels = [];
+  if (estimatedEffort) labels.push('Effort-' + estimatedEffort.replace(/\s/g, '-'));
+  if (targetQuarter) labels.push(targetQuarter.replace(/\s/g, '-'));
+
+  const url = CONFIG.JIRA_URL + '/rest/api/3/issue/' + epicKey;
+  const payload = {
+    fields: {
+      labels: labels
+    }
+  };
+
+  updateJiraIssue(url, payload);
+  Logger.log('Updated Epic ' + epicKey + ' labels: ' + labels.join(', '));
+  SpreadsheetApp.getUi().toast('Updated labels', 'Epic Updated', 3);
+}
+
+function updateJiraEpicDescription(sheet, row, epicKey) {
+  if (!epicKey) return;
+
+  const rowData = sheet.getRange(row, 1, 1, Object.keys(CONFIG.COLUMNS).length).getValues()[0];
+
+  const description = formatEpicDescription({
+    requestor: rowData[CONFIG.COLUMNS.EMAIL],
+    department: rowData[CONFIG.COLUMNS.DEPARTMENT],
+    timestamp: rowData[CONFIG.COLUMNS.TIMESTAMP],
+    problem: rowData[CONFIG.COLUMNS.PROBLEM],
+    impact: rowData[CONFIG.COLUMNS.IMPACT],
+    deliverables: rowData[CONFIG.COLUMNS.DELIVERABLES],
+    targetDate: rowData[CONFIG.COLUMNS.TARGET_DATE],
+    priority: rowData[CONFIG.COLUMNS.PRIORITY],
+    budget: rowData[CONFIG.COLUMNS.BUDGET],
+    estimatedEffort: rowData[CONFIG.COLUMNS.ESTIMATED_EFFORT],
+    targetQuarter: rowData[CONFIG.COLUMNS.TARGET_QUARTER],
+    itNotes: rowData[CONFIG.COLUMNS.IT_NOTES],
+    sheetUrl: sheet.getParent().getUrl() + '#gid=' + sheet.getSheetId() + '&range=A' + row
+  });
+
+  const url = CONFIG.JIRA_URL + '/rest/api/3/issue/' + epicKey;
+  const payload = {
+    fields: {
+      description: description
+    }
+  };
+
+  updateJiraIssue(url, payload);
+  Logger.log('Updated Epic ' + epicKey + ' description');
+  SpreadsheetApp.getUi().toast('Updated description', 'Epic Updated', 3);
+}
+
+function addJiraEpicComment(epicKey, comment) {
+  if (!epicKey || !comment) return;
+
+  const url = CONFIG.JIRA_URL + '/rest/api/3/issue/' + epicKey + '/comment';
+
+  const payload = {
+    body: {
+      type: "doc",
+      version: 1,
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "IT Notes Updated: ",
+              marks: [{ type: "strong" }]
+            },
+            {
+              type: "text",
+              text: comment
+            }
+          ]
+        }
+      ]
+    }
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'Authorization': 'Basic ' + Utilities.base64Encode(CONFIG.JIRA_EMAIL + ':' + CONFIG.JIRA_API_TOKEN)
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  UrlFetchApp.fetch(url, options);
+  Logger.log('Added comment to Epic ' + epicKey);
+  SpreadsheetApp.getUi().toast('Added IT Notes as comment', 'Epic Updated', 3);
+}
+
+function updateJiraIssue(url, payload) {
+  const options = {
+    method: 'put',
+    contentType: 'application/json',
+    headers: {
+      'Authorization': 'Basic ' + Utilities.base64Encode(CONFIG.JIRA_EMAIL + ':' + CONFIG.JIRA_API_TOKEN)
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  const response = UrlFetchApp.fetch(url, options);
+  const responseCode = response.getResponseCode();
+
+  if (responseCode !== 204 && responseCode !== 200) {
+    throw new Error('JIRA Update Error (' + responseCode + '): ' + response.getContentText());
+  }
+}
+
+// ========================================
+// FORMATTING FUNCTIONS
+// ========================================
+
+function formatEpicDescription(data) {
+  return {
+    "type": "doc",
+    "version": 1,
+    "content": [
+      {
+        "type": "heading",
+        "attrs": { "level": 3 },
+        "content": [{ "type": "text", "text": "INTAKE REQUEST" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "Submitted by: ", "marks": [{ "type": "strong" }] },
+          { "type": "text", "text": data.requestor || "Not provided" }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "Department: ", "marks": [{ "type": "strong" }] },
+          { "type": "text", "text": data.department || "Not provided" }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "Submitted on: ", "marks": [{ "type": "strong" }] },
+          { "type": "text", "text": formatDate(data.timestamp) }
+        ]
+      },
+      {
+        "type": "rule"
+      },
+      {
+        "type": "heading",
+        "attrs": { "level": 3 },
+        "content": [{ "type": "text", "text": "Problem Statement" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": data.problem || "Not provided" }]
+      },
+      {
+        "type": "heading",
+        "attrs": { "level": 3 },
+        "content": [{ "type": "text", "text": "Business Impact" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": data.impact || "Not provided" }]
+      },
+      {
+        "type": "heading",
+        "attrs": { "level": 3 },
+        "content": [{ "type": "text", "text": "Expected Deliverables" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": data.deliverables || "Not provided" }]
+      },
+      {
+        "type": "heading",
+        "attrs": { "level": 3 },
+        "content": [{ "type": "text", "text": "Target Completion" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": formatDate(data.targetDate) || "Not specified" }]
+      },
+      {
+        "type": "heading",
+        "attrs": { "level": 3 },
+        "content": [{ "type": "text", "text": "Priority" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": data.priority || "Not specified" }]
+      },
+      {
+        "type": "heading",
+        "attrs": { "level": 3 },
+        "content": [{ "type": "text", "text": "Budget Status" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": data.budget || "Not specified" }]
+      },
+      {
+        "type": "rule"
+      },
+      {
+        "type": "heading",
+        "attrs": { "level": 3 },
+        "content": [{ "type": "text", "text": "IT ASSESSMENT" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "Estimated Effort: ", "marks": [{ "type": "strong" }] },
+          { "type": "text", "text": data.estimatedEffort || "TBD" }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "Target Quarter: ", "marks": [{ "type": "strong" }] },
+          { "type": "text", "text": data.targetQuarter || "TBD" }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "IT Notes: ", "marks": [{ "type": "strong" }] },
+          { "type": "text", "text": data.itNotes || "None" }
+        ]
+      },
+      {
+        "type": "rule"
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "View Intake Form Submission",
+            "marks": [
+              {
+                "type": "link",
+                "attrs": { "href": data.sheetUrl }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  };
+}
+
+function formatDate(date) {
+  if (!date) return '';
+  if (typeof date === 'string') return date;
+
+  try {
+    return Utilities.formatDate(date, Session.getScriptTimeZone(), 'MMM dd, yyyy');
+  } catch (e) {
+    return date.toString();
+  }
+}
+
+// ========================================
+// SETUP & TESTING FUNCTIONS
+// ========================================
+
+function setup() {
+  Logger.log('Setup started...');
+
+  try {
+    const testUrl = CONFIG.JIRA_URL + '/rest/api/3/myself';
+    const options = {
+      method: 'get',
+      headers: {
+        'Authorization': 'Basic ' + Utilities.base64Encode(CONFIG.JIRA_EMAIL + ':' + CONFIG.JIRA_API_TOKEN)
+      },
+      muteHttpExceptions: true
+    };
+
+    const response = UrlFetchApp.fetch(testUrl, options);
+    const responseCode = response.getResponseCode();
+
+    if (responseCode === 200) {
+      const user = JSON.parse(response.getContentText());
+      Logger.log('✅ JIRA connection successful! Connected as: ' + user.displayName);
+      SpreadsheetApp.getUi().alert('Setup successful!\n\nJIRA connection verified.\nConnected as: ' + user.displayName);
+    } else {
+      throw new Error('JIRA authentication failed: ' + response.getContentText());
+    }
+  } catch (error) {
+    Logger.log('❌ Setup failed: ' + error.toString());
+    SpreadsheetApp.getUi().alert('Setup failed:\n\n' + error.toString());
+  }
+}
+
+function testCreateEpicFromRow2() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  createJiraEpicFromRow(sheet, 2);
+}
+
+function createEpicsForAllApproved() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const lastRow = sheet.getLastRow();
+
+  let created = 0;
+  let skipped = 0;
+
+  for (let row = 2; row <= lastRow; row++) {
+    const recommendation = sheet.getRange(row, CONFIG.COLUMNS.IT_RECOMMENDATION + 1).getValue();
+    const existingLink = sheet.getRange(row, CONFIG.COLUMNS.JIRA_EPIC_LINK + 1).getValue();
+
+    if (recommendation === 'Approve' && (!existingLink || existingLink.trim() === '')) {
+      try {
+        createJiraEpicFromRow(sheet, row);
+        created++;
+        Utilities.sleep(1000);
+      } catch (error) {
+        Logger.log('Error processing row ' + row + ': ' + error.toString());
+        skipped++;
+      }
+    } else {
+      skipped++;
+    }
+  }
+
+  SpreadsheetApp.getUi().alert(
+    'Batch processing complete!\n\n' +
+    'Epics created: ' + created + '\n' +
+    'Rows skipped: ' + skipped
+  );
+}

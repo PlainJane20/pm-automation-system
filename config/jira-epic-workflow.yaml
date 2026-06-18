@@ -1,0 +1,291 @@
+# JIRA Epic Workflow Configuration
+# Phase 2: Epic Lifecycle Management
+#
+# This file documents the Epic workflow to be configured in JIRA UI.
+# JIRA does not support workflow import via YAML, so this serves as documentation
+# for manual configuration in: Project Settings → Workflows → Create workflow
+#
+# Associated with: Epic issue type only (not Stories)
+
+name: "Epic Lifecycle Workflow"
+description: "Strategic program management workflow for Epics from intake to completion"
+
+statuses:
+  - name: "INTAKE"
+    category: "To Do"
+    description: "New request from stakeholder, auto-set when Epic is created from Google Form approval"
+
+  - name: "UNDER_REVIEW"
+    category: "In Progress"
+    description: "TPM evaluating capacity, ROI, strategic alignment, and feasibility"
+
+  - name: "BACKLOG"
+    category: "To Do"
+    description: "Approved for future development but not yet scheduled due to capacity constraints"
+
+  - name: "IN_ROADMAP"
+    category: "In Progress"
+    description: "Scheduled for a specific quarter with assigned capacity"
+
+  - name: "IN_EXECUTION"
+    category: "In Progress"
+    description: "Active development - has Stories currently in progress in sprints"
+
+  - name: "ON_HOLD"
+    category: "To Do"
+    description: "Paused due to dependency, reprioritization, or external blocker"
+
+  - name: "COMPLETED"
+    category: "Done"
+    description: "All Stories delivered, Epic objectives achieved"
+
+  - name: "REJECTED"
+    category: "Done"
+    description: "Request denied - not aligned with strategy or insufficient business value"
+
+transitions:
+  # From INTAKE
+  - name: "Start Review"
+    from: "INTAKE"
+    to: "UNDER_REVIEW"
+    type: "manual"
+    who_can_execute: "IT Leadership, TPM"
+    validators:
+      - "Epic must have Request Type field populated"
+    post_functions:
+      - "Assign to TPM (if not already assigned)"
+      - "Add comment: 'Epic moved to review. TPM will evaluate capacity and alignment.'"
+
+  # From UNDER_REVIEW
+  - name: "Approve to Backlog"
+    from: "UNDER_REVIEW"
+    to: "BACKLOG"
+    type: "manual"
+    who_can_execute: "IT Leadership, TPM"
+    validators:
+      - "Business Value Score must be set (1-10)"
+      - "Technical Complexity Score must be set (1-10)"
+    post_functions:
+      - "Add label: 'approved'"
+      - "Send email to stakeholder: 'Your request has been approved and added to backlog'"
+      - "Add comment: 'Approved. Awaiting capacity allocation.'"
+
+  - name: "Reject Request"
+    from: "UNDER_REVIEW"
+    to: "REJECTED"
+    type: "manual"
+    who_can_execute: "IT Leadership, TPM"
+    screen: "Rejection Screen"
+    required_fields:
+      - "Rejection Reason (text field)"
+    post_functions:
+      - "Send email to stakeholder with rejection reason"
+      - "Add comment: 'Request rejected. Reason: {{Rejection Reason}}'"
+
+  # From BACKLOG
+  - name: "Schedule to Roadmap"
+    from: "BACKLOG"
+    to: "IN_ROADMAP"
+    type: "manual"
+    who_can_execute: "IT Leadership, TPM"
+    validators:
+      - "Committed Quarter must be set"
+      - "Team Capacity Allocation (%) must be set"
+      - "Capacity validation check (via Railway middleware webhook)"
+    post_functions:
+      - "Add label: 'roadmap-{{Committed Quarter}}'"
+      - "Send email to stakeholder: 'Your request is scheduled for {{Committed Quarter}}'"
+      - "Add comment: 'Scheduled for {{Committed Quarter}}. Capacity allocated: {{Team Capacity Allocation}}%'"
+
+  # From IN_ROADMAP
+  - name: "Start Execution"
+    from: "IN_ROADMAP"
+    to: "IN_EXECUTION"
+    type: "automatic"
+    trigger: "First child Story transitions to IN_PROGRESS"
+    post_functions:
+      - "Send email to stakeholder: 'Development has started on your request'"
+      - "Post to Slack channel #program-updates"
+      - "Add comment: 'Epic now in execution. First Story started.'"
+
+  - name: "Put On Hold"
+    from: "IN_ROADMAP"
+    to: "ON_HOLD"
+    type: "manual"
+    who_can_execute: "IT Leadership, TPM"
+    screen: "On Hold Screen"
+    required_fields:
+      - "Hold Reason (text field)"
+      - "Blocker Type (select: Dependency, Reprioritized, Budget, Resource)"
+    post_functions:
+      - "Send email to stakeholder with hold reason"
+      - "Add comment: 'Epic on hold. Reason: {{Hold Reason}}'"
+
+  # From IN_EXECUTION
+  - name: "Complete Epic"
+    from: "IN_EXECUTION"
+    to: "COMPLETED"
+    type: "automatic"
+    trigger: "All child Stories have status = DONE or CLOSED"
+    scheduled: "Daily at 9 AM"
+    post_functions:
+      - "Set Completion Date = today"
+      - "Send email to stakeholder: 'Your request has been delivered!'"
+      - "Add comment: 'All Stories completed. Epic delivered.'"
+      - "Add label: 'delivered'"
+
+  - name: "Hold Execution"
+    from: "IN_EXECUTION"
+    to: "ON_HOLD"
+    type: "manual"
+    who_can_execute: "IT Leadership, TPM, Scrum Master"
+    screen: "On Hold Screen"
+    required_fields:
+      - "Hold Reason (text field)"
+    post_functions:
+      - "Send email to stakeholder and team"
+      - "Add comment: 'Execution paused. Reason: {{Hold Reason}}'"
+
+  # From ON_HOLD
+  - name: "Resume to Roadmap"
+    from: "ON_HOLD"
+    to: "IN_ROADMAP"
+    type: "manual"
+    who_can_execute: "IT Leadership, TPM"
+    validators:
+      - "Hold Reason resolved (comment required)"
+    post_functions:
+      - "Send email to stakeholder: 'Your request has been resumed'"
+      - "Add comment: 'Blocker resolved. Epic resumed.'"
+
+  - name: "Resume Execution"
+    from: "ON_HOLD"
+    to: "IN_EXECUTION"
+    type: "manual"
+    who_can_execute: "IT Leadership, TPM"
+    validators:
+      - "Has active Stories in current sprint"
+    post_functions:
+      - "Send email to team and stakeholder"
+      - "Add comment: 'Execution resumed.'"
+
+# Screen Configurations
+screens:
+  - name: "Epic Create Screen"
+    fields:
+      - "Summary (required)"
+      - "Description (required)"
+      - "Request Type (required)"
+      - "Priority (required)"
+      - "Assignee"
+      - "Labels"
+
+  - name: "Epic Edit Screen"
+    fields:
+      - "Summary"
+      - "Description"
+      - "Request Type"
+      - "Priority"
+      - "Due Date"
+      - "Business Value Score"
+      - "Technical Complexity Score"
+      - "Risk Flags"
+      - "Committed Quarter"
+      - "Team Capacity Allocation (%)"
+      - "Assignee"
+      - "Labels"
+
+  - name: "Rejection Screen"
+    fields:
+      - "Rejection Reason (text area, required)"
+      - "Alternative Approach (text area, optional)"
+
+  - name: "On Hold Screen"
+    fields:
+      - "Hold Reason (text area, required)"
+      - "Blocker Type (select, required)"
+      - "Expected Resume Date (date picker, optional)"
+
+# Implementation Notes
+implementation:
+  steps:
+    - "JIRA → Project Settings (PGMAUTO) → Workflows"
+    - "Click 'Add workflow'"
+    - "Select 'Create from scratch'"
+    - "Name: 'Epic Lifecycle Workflow'"
+    - "Add all 8 statuses defined above"
+    - "Create transitions between statuses as documented"
+    - "Add validators and post-functions to each transition"
+    - "Create/update screens as needed"
+    - "Associate workflow with Epic issue type only"
+    - "Publish workflow"
+
+  testing:
+    - "Create test Epic with status INTAKE"
+    - "Transition through all statuses manually"
+    - "Verify validators block invalid transitions"
+    - "Verify post-functions execute (emails, comments, labels)"
+    - "Verify automatic transitions work (IN_ROADMAP → IN_EXECUTION, IN_EXECUTION → COMPLETED)"
+
+# Validators (to be configured in JIRA UI)
+validators:
+  - name: "Capacity Check"
+    description: "Validates team has capacity for Epic in target quarter"
+    trigger: "Transition to IN_ROADMAP"
+    implementation: "Railway middleware webhook"
+    endpoint: "https://pm-automation-system-production.up.railway.app/webhooks/jira/issue-transitioned"
+
+  - name: "Required Fields Check"
+    description: "Ensures all required fields are populated before transition"
+    trigger: "All transitions"
+    implementation: "JIRA native validator"
+
+  - name: "Permission Check"
+    description: "Only IT Leadership/TPM can transition Epics"
+    trigger: "All manual transitions"
+    implementation: "JIRA native validator (user in role/group)"
+
+# Post-Functions (to be configured in JIRA UI)
+post_functions:
+  - name: "Stakeholder Email Notification"
+    description: "Sends email to stakeholder at key Epic milestones"
+    trigger: "BACKLOG, IN_ROADMAP, IN_EXECUTION, ON_HOLD, COMPLETED, REJECTED"
+    implementation: "JIRA Automation rule (see jira-epic-automation-rules.yaml)"
+
+  - name: "Slack Notification"
+    description: "Posts to #program-updates channel"
+    trigger: "IN_EXECUTION, COMPLETED"
+    implementation: "JIRA Automation rule with Slack integration"
+
+  - name: "Auto-Label"
+    description: "Adds status-based labels for filtering"
+    trigger: "All transitions"
+    implementation: "JIRA native post-function"
+
+# Custom Field IDs (update after creating fields in JIRA)
+custom_fields:
+  business_value_score: "customfield_XXXXX"  # UPDATE with actual ID
+  technical_complexity_score: "customfield_YYYYY"  # UPDATE with actual ID
+  risk_flags: "customfield_ZZZZZ"  # UPDATE with actual ID
+  committed_quarter: "customfield_AAAAA"  # UPDATE with actual ID
+  team_capacity_allocation: "customfield_BBBBB"  # UPDATE with actual ID
+  rejection_reason: "customfield_CCCCC"  # UPDATE with actual ID
+  hold_reason: "customfield_DDDDD"  # UPDATE with actual ID
+  blocker_type: "customfield_EEEEE"  # UPDATE with actual ID
+
+# Integration Points
+integrations:
+  - name: "Google Apps Script"
+    description: "Sets Epic status to INTAKE when created from intake form"
+    file: "google-apps-script-COMPLETE-WITH-REQUEST-TYPE.txt"
+    update: "Set status field in epicPayload to 'INTAKE'"
+
+  - name: "Railway Middleware"
+    description: "Validates capacity before IN_ROADMAP transition"
+    file: "app/webhooks.py"
+    function: "handle_epic_transition()"
+
+  - name: "JIRA Automation"
+    description: "Auto-transitions based on child Story status"
+    file: "config/jira-epic-automation-rules.yaml"
+    rules: "Rule 12 (IN_EXECUTION), Rule 13 (COMPLETED)"

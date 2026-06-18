@@ -306,4 +306,4 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 ---
 
-**Built with ❤️ by Navi Sohi**
+**Built by Navi Sohi | TPM who codes | Automating the chaos 🚀**

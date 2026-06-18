@@ -1,0 +1,529 @@
+# JIRA Epic Automation Rules
+# Phase 2: Epic Lifecycle Automation
+#
+# These automation rules manage Epic transitions and notifications.
+# Configure in: JIRA → Project Settings → Automation → Create rule
+#
+# Prerequisites:
+# - Epic workflow created (see jira-epic-workflow.yaml)
+# - Custom fields created (see jira-custom-fields.json)
+# - Slack integration configured (optional, for Slack notifications)
+
+automation_rules:
+  # ========================================
+  # RULE 10: Epic Welcome Comment
+  # ========================================
+  - rule_id: 10
+    name: "Epic: Welcome Comment on Creation"
+    description: "Adds welcome comment when Epic is created from intake form"
+    enabled: true
+
+    trigger:
+      type: "Issue created"
+      filter:
+        issue_type: "Epic"
+        project: "PGMAUTO"
+
+    conditions:
+      - type: "Issue fields condition"
+        field: "Status"
+        condition: "equals"
+        value: "INTAKE"
+
+    actions:
+      - type: "Add comment"
+        comment: |
+          🎉 **Welcome to the PMO!**
+
+          Your request has been successfully created as an Epic and is now in the intake queue.
+
+          **Next Steps:**
+          1. IT Leadership will review your request within 3-5 business days
+          2. You'll receive an email when your request is approved or if we need more information
+          3. Once approved, your request will be scheduled for a specific quarter
+
+          **Questions?** Contact your TPM or reply to the intake form email.
+
+          ---
+          *Epic ID: {{issue.key}}*
+          *Submitted by: {{issue.Email Address}}*
+          *Department: {{issue.Department}}*
+
+      - type: "Assign issue"
+        assignee: "automatic"  # Assign to project lead or TPM
+
+  # ========================================
+  # RULE 11: Auto-Transition to IN_ROADMAP
+  # ========================================
+  - rule_id: 11
+    name: "Epic: Schedule to Roadmap When Quarter Assigned"
+    description: "Auto-transitions Epic to IN_ROADMAP when Committed Quarter is set"
+    enabled: true
+
+    trigger:
+      type: "Field value changed"
+      field: "Committed Quarter"
+      for:
+        issue_type: "Epic"
+        project: "PGMAUTO"
+
+    conditions:
+      - type: "Issue fields condition"
+        field: "Committed Quarter"
+        condition: "is not empty"
+
+      - type: "Issue fields condition"
+        field: "Status"
+        condition: "equals"
+        value: "BACKLOG"
+
+      - type: "Issue fields condition"
+        field: "Team Capacity Allocation (%)"
+        condition: "is not empty"
+
+    actions:
+      - type: "Transition issue"
+        transition: "Schedule to Roadmap"
+
+      - type: "Add label"
+        label: "roadmap-{{issue.Committed Quarter}}"
+
+      - type: "Send email"
+        to: "{{issue.Email Address}}"
+        subject: "Your Request Scheduled for {{issue.Committed Quarter}}"
+        body: |
+          Hello,
+
+          Great news! Your request has been scheduled for delivery.
+
+          **Epic:** {{issue.key}} - {{issue.summary}}
+          **Target Quarter:** {{issue.Committed Quarter}}
+          **Priority:** {{issue.Priority}}
+
+          Your request is now on the roadmap and will be broken down into Stories for development.
+
+          You'll receive another notification when development starts.
+
+          View your Epic: {{issue.url}}
+
+          Best regards,
+          IT Program Management
+
+      - type: "Add comment"
+        comment: |
+          📅 **Epic Scheduled**
+
+          This Epic has been added to the roadmap for **{{issue.Committed Quarter}}**.
+
+          **Capacity Allocated:** {{issue.Team Capacity Allocation (%)}}%
+          **Business Value Score:** {{issue.Business Value Score}}/10
+          **Technical Complexity:** {{issue.Technical Complexity Score}}/10
+
+          Next: Epic will be broken down into Stories for sprint planning.
+
+  # ========================================
+  # RULE 12: Auto-Transition to IN_EXECUTION
+  # ========================================
+  - rule_id: 12
+    name: "Epic: Activate on Story Development Start"
+    description: "Auto-transitions Epic to IN_EXECUTION when first child Story starts development"
+    enabled: true
+
+    trigger:
+      type: "Issue transitioned"
+      from_status: "READY_FOR_DEV"
+      to_status: "IN_PROGRESS"
+      for:
+        issue_type: "Story"
+        project: "PGMAUTO"
+
+    conditions:
+      - type: "Issue fields condition"
+        field: "Parent"
+        condition: "is not empty"
+
+      - type: "Related issues condition"
+        relationship: "parent"
+        issue_type: "Epic"
+        status: "IN_ROADMAP"
+
+    actions:
+      - type: "Transition related issues"
+        relationship: "parent"
+        transition: "Start Execution"
+
+      - type: "Add comment to related issues"
+        relationship: "parent"
+        comment: |
+          🚀 **Development Started**
+
+          This Epic is now in execution!
+
+          **First Story Started:** {{trigger.issue.key}} - {{trigger.issue.summary}}
+          **Started by:** {{trigger.user.displayName}}
+          **Sprint:** {{trigger.issue.Sprint}}
+
+          You can track progress on the Scrum board.
+
+      - type: "Send email"
+        to: "{{parent.Email Address}}"
+        subject: "Development Started on Your Request"
+        body: |
+          Hello,
+
+          Exciting news! Development has started on your request.
+
+          **Epic:** {{parent.key}} - {{parent.summary}}
+          **First Story:** {{trigger.issue.key}} - {{trigger.issue.summary}}
+          **Sprint:** {{trigger.issue.Sprint}}
+
+          You can track real-time progress here: {{parent.url}}
+
+          We'll notify you when Stories are completed and ready for testing.
+
+          Best regards,
+          Development Team
+
+      - type: "Post to Slack"
+        channel: "#program-updates"
+        message: |
+          🚀 **Epic Started: {{parent.key}}**
+
+          *{{parent.summary}}*
+
+          First Story: {{trigger.issue.key}}
+          Sprint: {{trigger.issue.Sprint}}
+          Owner: {{parent.Assignee.displayName}}
+
+          <{{parent.url}}|View Epic>
+
+  # ========================================
+  # RULE 13: Auto-Complete Epic
+  # ========================================
+  - rule_id: 13
+    name: "Epic: Auto-Complete When All Stories Done"
+    description: "Auto-transitions Epic to COMPLETED when all child Stories are done"
+    enabled: true
+
+    trigger:
+      type: "Scheduled"
+      schedule: "Daily at 9:00 AM"
+
+    # For each Epic in execution, check if all Stories are done
+    for_each:
+      jql: "project = PGMAUTO AND issuetype = Epic AND status = IN_EXECUTION"
+
+    conditions:
+      - type: "Related issues condition"
+        relationship: "child"
+        jql: "status NOT IN (DONE, CLOSED)"
+        count_condition: "equals"
+        count: 0
+        # This means: "has NO child Stories that are NOT done" = "all Stories are done"
+
+    actions:
+      - type: "Transition issue"
+        transition: "Complete Epic"
+
+      - type: "Set field value"
+        field: "Completion Date"
+        value: "{{now}}"
+
+      - type: "Add label"
+        label: "delivered"
+
+      - type: "Add comment"
+        comment: |
+          ✅ **Epic Completed!**
+
+          All Stories in this Epic have been delivered.
+
+          **Completion Date:** {{now}}
+          **Total Stories:** {{issue.subtasks.size}}
+          **Duration:** {{issue.created}} to {{now}}
+
+          Thank you for using the PMO system!
+
+      - type: "Send email"
+        to: "{{issue.Email Address}}"
+        subject: "Your Request Has Been Delivered! ✅"
+        body: |
+          Hello,
+
+          Great news! Your request has been completed and delivered.
+
+          **Epic:** {{issue.key}} - {{issue.summary}}
+          **Completion Date:** {{now}}
+          **Total Stories Delivered:** {{issue.subtasks.size}}
+
+          All development work is complete. Please review the delivered features and provide feedback.
+
+          View Epic: {{issue.url}}
+
+          Thank you for partnering with IT!
+
+          Best regards,
+          IT Program Management
+
+      - type: "Post to Slack"
+        channel: "#program-updates"
+        message: |
+          ✅ **Epic Delivered: {{issue.key}}**
+
+          *{{issue.summary}}*
+
+          Stories: {{issue.subtasks.size}} completed
+          Requestor: {{issue.Email Address}}
+          Quarter: {{issue.Committed Quarter}}
+
+          <{{issue.url}}|View Epic>
+
+  # ========================================
+  # RULE 14: Rejection Notification
+  # ========================================
+  - rule_id: 14
+    name: "Epic: Rejection Notification"
+    description: "Sends detailed email when Epic is rejected with reason"
+    enabled: true
+
+    trigger:
+      type: "Issue transitioned"
+      to_status: "REJECTED"
+      for:
+        issue_type: "Epic"
+        project: "PGMAUTO"
+
+    actions:
+      - type: "Send email"
+        to: "{{issue.Email Address}}"
+        subject: "Request Status Update: Not Approved"
+        body: |
+          Hello,
+
+          Thank you for submitting your request through the PMO intake process.
+
+          After careful review, we are unable to proceed with this request at this time.
+
+          **Epic:** {{issue.key}} - {{issue.summary}}
+          **Reason:** {{issue.Rejection Reason}}
+
+          {{#if issue.Alternative Approach}}
+          **Alternative Approach Suggested:**
+          {{issue.Alternative Approach}}
+          {{/if}}
+
+          If you have questions or would like to discuss alternatives, please contact your TPM.
+
+          View Epic: {{issue.url}}
+
+          Best regards,
+          IT Leadership Team
+
+      - type: "Add comment"
+        comment: |
+          ❌ **Request Rejected**
+
+          **Reason:** {{issue.Rejection Reason}}
+
+          {{#if issue.Alternative Approach}}
+          **Alternative Approach:**
+          {{issue.Alternative Approach}}
+          {{/if}}
+
+          Stakeholder has been notified via email.
+
+  # ========================================
+  # RULE 15: On Hold Notification
+  # ========================================
+  - rule_id: 15
+    name: "Epic: On Hold Notification"
+    description: "Notifies stakeholder when Epic is put on hold with reason"
+    enabled: true
+
+    trigger:
+      type: "Issue transitioned"
+      to_status: "ON_HOLD"
+      for:
+        issue_type: "Epic"
+        project: "PGMAUTO"
+
+    actions:
+      - type: "Send email"
+        to: "{{issue.Email Address}}"
+        subject: "Request Temporarily On Hold"
+        body: |
+          Hello,
+
+          We wanted to update you on the status of your request.
+
+          **Epic:** {{issue.key}} - {{issue.summary}}
+          **Status:** On Hold
+          **Reason:** {{issue.Hold Reason}}
+          **Blocker Type:** {{issue.Blocker Type}}
+
+          {{#if issue.Expected Resume Date}}
+          **Expected Resume Date:** {{issue.Expected Resume Date}}
+          {{/if}}
+
+          We are actively working to resolve the blocker and will notify you when development resumes.
+
+          View Epic: {{issue.url}}
+
+          Best regards,
+          IT Program Management
+
+      - type: "Add comment"
+        comment: |
+          ⏸️ **Epic On Hold**
+
+          **Reason:** {{issue.Hold Reason}}
+          **Blocker Type:** {{issue.Blocker Type}}
+
+          {{#if issue.Expected Resume Date}}
+          **Expected Resume:** {{issue.Expected Resume Date}}
+          {{/if}}
+
+          Stakeholder and team have been notified.
+
+  # ========================================
+  # RULE 16: Capacity Warning Alert
+  # ========================================
+  - rule_id: 16
+    name: "Epic: Capacity Warning for TPM"
+    description: "Alerts TPM when quarter capacity exceeds 80%"
+    enabled: true
+
+    trigger:
+      type: "Issue transitioned"
+      to_status: "IN_ROADMAP"
+      for:
+        issue_type: "Epic"
+        project: "PGMAUTO"
+
+    # This rule relies on Railway middleware to calculate capacity
+    # If capacity > 80%, middleware adds a label "capacity-warning"
+    conditions:
+      - type: "Issue has label"
+        label: "capacity-warning"
+
+    actions:
+      - type: "Send email"
+        to: "tpm@company.com"  # UPDATE with actual TPM email
+        subject: "⚠️ Capacity Warning: {{issue.Committed Quarter}}"
+        body: |
+          Warning: Quarter capacity is over 80% utilized.
+
+          **Quarter:** {{issue.Committed Quarter}}
+          **Latest Epic Added:** {{issue.key}} - {{issue.summary}}
+          **Capacity Allocated:** {{issue.Team Capacity Allocation (%)}}%
+
+          Review the roadmap to ensure team is not over-committed:
+          {{boardUrl}}/roadmap
+
+          Consider:
+          - Moving lower-priority Epics to later quarter
+          - Increasing team capacity (hiring, contractors)
+          - Adjusting scope of existing Epics
+
+      - type: "Add comment"
+        comment: |
+          ⚠️ **Capacity Warning**
+
+          {{issue.Committed Quarter}} is now >80% utilized.
+
+          TPM has been notified to review capacity allocation.
+
+  # ========================================
+  # RULE 17: Epic Status Sync to Google Sheet
+  # ========================================
+  - rule_id: 17
+    name: "Epic: Update Google Sheet on Status Change"
+    description: "Optional: Updates Google Sheet when Epic status changes"
+    enabled: false  # Enable if you want bidirectional sync
+
+    trigger:
+      type: "Issue transitioned"
+      for:
+        issue_type: "Epic"
+        project: "PGMAUTO"
+
+    actions:
+      - type: "Send web request"
+        url: "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"
+        method: "POST"
+        headers:
+          Content-Type: "application/json"
+        body: |
+          {
+            "epic_key": "{{issue.key}}",
+            "status": "{{issue.Status}}",
+            "updated_by": "{{user.displayName}}",
+            "timestamp": "{{now}}"
+          }
+        # Note: This requires a Google Apps Script web app endpoint
+        # See google-apps-script-COMPLETE-WITH-REQUEST-TYPE.txt for implementation
+
+# Implementation Instructions
+implementation:
+  location: "JIRA → Project Settings (PGMAUTO) → Automation"
+
+  steps:
+    - "Click 'Create rule' for each rule above"
+    - "Select trigger type as specified"
+    - "Add conditions (if/then logic)"
+    - "Add actions (what happens)"
+    - "Test each rule with a dummy Epic"
+    - "Enable rule once tested"
+
+  testing:
+    - "Create test Epic and transition through all statuses"
+    - "Verify emails are sent to correct recipients"
+    - "Verify Slack notifications appear (if configured)"
+    - "Verify comments are added"
+    - "Verify labels are applied"
+    - "Verify automatic transitions work"
+
+  notes:
+    - "Slack integration requires Slack app configured in JIRA"
+    - "Email notifications use JIRA notification settings"
+    - "Update email addresses and Slack channels before enabling"
+    - "Test with real email addresses to verify formatting"
+
+# Slack Integration Setup (Optional)
+slack_integration:
+  channel: "#program-updates"
+  setup:
+    - "JIRA → Apps → Slack"
+    - "Connect Slack workspace"
+    - "Authorize JIRA bot to post to #program-updates"
+    - "Enable in automation rules"
+
+  message_format: "Markdown supported in Slack messages"
+
+  alternative: "Use webhooks to Railway middleware to post to Slack via API"
+
+# Email Templates
+email_templates:
+  approved:
+    subject: "Your Request Has Been Approved"
+    tone: "Positive, informative"
+
+  scheduled:
+    subject: "Your Request Scheduled for {Quarter}"
+    tone: "Positive, sets expectations"
+
+  started:
+    subject: "Development Started on Your Request"
+    tone: "Exciting, transparent"
+
+  completed:
+    subject: "Your Request Has Been Delivered! ✅"
+    tone: "Celebratory, appreciative"
+
+  rejected:
+    subject: "Request Status Update: Not Approved"
+    tone: "Professional, empathetic, suggests alternatives"
+
+  on_hold:
+    subject: "Request Temporarily On Hold"
+    tone: "Transparent, reassuring"

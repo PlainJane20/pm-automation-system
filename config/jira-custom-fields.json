@@ -76,6 +76,7 @@
 
     {
       "name": "Business Value Score",
+      "field_id": "customfield_10077",
       "type": "number",
       "description": "Business impact rating (1-10 scale)",
       "issue_types": ["Epic"],
@@ -85,6 +86,7 @@
     },
     {
       "name": "Technical Complexity Score",
+      "field_id": "customfield_10078",
       "type": "number",
       "description": "Technical difficulty rating (1-10 scale)",
       "issue_types": ["Epic"],
@@ -94,6 +96,7 @@
     },
     {
       "name": "Risk Flags",
+      "field_id": "customfield_10079",
       "type": "multiselect",
       "description": "Epic-level risk categories",
       "issue_types": ["Epic"],
@@ -101,16 +104,18 @@
         "Vendor Dependency",
         "Data Migration",
         "Third-party API",
-        "Compliance Requirement",
-        "Security Review Required",
-        "Infrastructure Changes",
-        "Cross-team Dependencies"
+        "Compliance",
+        "Security",
+        "Performance",
+        "Backward Compatibility",
+        "IT Launch Required"
       ],
       "default": [],
       "help_text": "Select all risks that apply to this Epic"
     },
     {
       "name": "Committed Quarter",
+      "field_id": "customfield_10080",
       "type": "select",
       "description": "Target delivery quarter",
       "issue_types": ["Epic"],
@@ -121,14 +126,13 @@
         "Q3 2026",
         "Q4 2026",
         "Q1 2027",
-        "Q2 2027",
-        "Q3 2027",
-        "Q4 2027"
+        "Q2 2027"
       ],
       "help_text": "Quarter when this Epic is scheduled for delivery"
     },
     {
       "name": "Team Capacity Allocation (%)",
+      "field_id": "customfield_10081",
       "type": "number",
       "description": "Percentage of team capacity needed for this Epic",
       "issue_types": ["Epic"],
@@ -138,6 +142,7 @@
     },
     {
       "name": "Rejection Reason",
+      "field_id": "customfield_10082",
       "type": "textarea",
       "description": "Reason why Epic was rejected",
       "issue_types": ["Epic"],
@@ -146,6 +151,7 @@
     },
     {
       "name": "Alternative Approach",
+      "field_id": "customfield_10083",
       "type": "textarea",
       "description": "Suggested alternative to rejected request",
       "issue_types": ["Epic"],
@@ -153,6 +159,7 @@
     },
     {
       "name": "Hold Reason",
+      "field_id": "customfield_10084",
       "type": "textarea",
       "description": "Reason why Epic is on hold",
       "issue_types": ["Epic"],
@@ -161,6 +168,7 @@
     },
     {
       "name": "Blocker Type",
+      "field_id": "customfield_10085",
       "type": "select",
       "description": "Category of blocker",
       "issue_types": ["Epic"],
@@ -168,14 +176,13 @@
       "options": [
         "External Dependency",
         "Reprioritized",
-        "Budget Constraint",
-        "Resource Unavailable",
-        "Technical Blocker",
-        "Stakeholder Decision Pending"
+        "Resource Constraint",
+        "Technical Blocker"
       ]
     },
     {
       "name": "Expected Resume Date",
+      "field_id": "customfield_10086",
       "type": "date",
       "description": "When Epic is expected to resume",
       "issue_types": ["Epic"],
@@ -183,6 +190,7 @@
     },
     {
       "name": "Completion Date",
+      "field_id": "customfield_10087",
       "type": "date",
       "description": "Date when Epic was completed",
       "issue_types": ["Epic"],

@@ -1,0 +1,113 @@
+{
+  "phase": "Phase 3: Story-Level BRD Workflow",
+  "issue_type": "Story",
+  "description": "Custom fields that enforce the Definition of Ready (DoR) before a Story can move to READY_FOR_DEV / IN_PROGRESS. Some fields already exist from Phase 1 (config/jira-custom-fields.json) - the setup script checks before creating and skips existing fields.",
+
+  "created_field_ids": {
+    "_note": "Created via create_phase3_fields.py on 2026-07-30 against nksaidev.atlassian.net",
+    "User Story": "customfield_10153",
+    "Acceptance Criteria": "customfield_10154",
+    "Technical Approach": "customfield_10155",
+    "BRD Reviewer": "customfield_10156",
+    "Story Points": "customfield_10040"
+  },
+
+  "custom_fields": [
+    {
+      "name": "User Story",
+      "type": "textarea",
+      "jira_type": "com.atlassian.jira.plugin.system.customfieldtypes:textarea",
+      "searcherKey": "com.atlassian.jira.plugin.system.customfieldtypes:textsearcher",
+      "description": "As a [role], I want [feature], so that [benefit]",
+      "issue_types": ["Story"],
+      "required_for_transition": "BRD_REVIEW -> READY_FOR_DEV",
+      "dor_gate": true,
+      "help_text": "Write the user story in the standard format so value and audience are explicit."
+    },
+    {
+      "name": "Acceptance Criteria",
+      "type": "textarea",
+      "jira_type": "com.atlassian.jira.plugin.system.customfieldtypes:textarea",
+      "searcherKey": "com.atlassian.jira.plugin.system.customfieldtypes:textsearcher",
+      "description": "Testable, bullet-listed conditions that define 'done' for this Story",
+      "issue_types": ["Story"],
+      "required_for_transition": "BRD_REVIEW -> READY_FOR_DEV",
+      "dor_gate": true,
+      "help_text": "Each criterion must be independently testable by QA."
+    },
+    {
+      "name": "Technical Approach",
+      "type": "textarea",
+      "jira_type": "com.atlassian.jira.plugin.system.customfieldtypes:textarea",
+      "searcherKey": "com.atlassian.jira.plugin.system.customfieldtypes:textsearcher",
+      "description": "High-level implementation plan agreed with the Tech Lead",
+      "issue_types": ["Story"],
+      "required_for_transition": "BRD_REVIEW -> READY_FOR_DEV",
+      "dor_gate": true,
+      "help_text": "Outline the approach, key components touched, and any spikes needed."
+    },
+    {
+      "name": "BRD Reviewer",
+      "type": "user",
+      "jira_type": "com.atlassian.jira.plugin.system.customfieldtypes:userpicker",
+      "searcherKey": "com.atlassian.jira.plugin.system.customfieldtypes:userpickergroupsearcher",
+      "description": "Tech Lead who reviewed and signed off the BRD / requirements",
+      "issue_types": ["Story"],
+      "required_for_transition": "BRD_REVIEW -> READY_FOR_DEV",
+      "dor_gate": true,
+      "help_text": "Set when the Tech Lead approves the requirements during BRD_REVIEW."
+    },
+    {
+      "name": "Story Points",
+      "type": "number",
+      "jira_type": "com.atlassian.jira.plugin.system.customfieldtypes:float",
+      "searcherKey": "com.atlassian.jira.plugin.system.customfieldtypes:numberrange",
+      "description": "Effort estimate in story points",
+      "issue_types": ["Story"],
+      "required_for_transition": "BRD_REVIEW -> READY_FOR_DEV",
+      "dor_gate": true,
+      "note": "May already exist as a JIRA built-in / agile field - the setup script checks first and skips if present.",
+      "help_text": "Estimated during backlog refinement (Fibonacci: 1,2,3,5,8,13)."
+    },
+
+    {
+      "name": "BRD Document Link",
+      "type": "url",
+      "description": "Link to approved BRD (Google Docs or Confluence)",
+      "issue_types": ["Story"],
+      "dor_gate": true,
+      "already_exists": true,
+      "source": "config/jira-custom-fields.json (Phase 1) - reference only, do not recreate"
+    },
+    {
+      "name": "BRD Approved Date",
+      "type": "date",
+      "description": "Date the BRD was approved by stakeholders",
+      "issue_types": ["Story"],
+      "dor_gate": true,
+      "already_exists": true,
+      "source": "config/jira-custom-fields.json (Phase 1) - reference only, do not recreate"
+    }
+  ],
+
+  "definition_of_ready": {
+    "description": "All items below must be satisfied before a Story transitions BRD_REVIEW -> READY_FOR_DEV. The Railway middleware (app/rules/brd_gate.py::enforce_dor_gate) validates these and comments on violations; the JIRA Automation rule performs the actual transition block.",
+    "checklist": [
+      "User Story written (As a... I want... so that...)",
+      "Acceptance Criteria defined and testable",
+      "Technical Approach documented",
+      "Story Points estimated",
+      "BRD Document Link populated",
+      "BRD Approved Date set",
+      "BRD Reviewer (Tech Lead) assigned"
+    ]
+  },
+
+  "setup_instructions": {
+    "step_1": "Populate .env with JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN (never hardcode).",
+    "step_2": "Run: python create_phase3_fields.py  (or POST /setup/phase3-fields)",
+    "step_3": "Copy the printed field IDs into this file and config/jira-story-workflow.yaml.",
+    "step_4": "Associate the new fields with the Story Create/Edit/View screens.",
+    "step_5": "Proceed to create the Story workflow (config/jira-story-workflow.yaml)."
+  }
+}

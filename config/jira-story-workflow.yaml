@@ -238,8 +238,14 @@ custom_fields:
   technical_approach: "customfield_10155"
   brd_reviewer: "customfield_10156"
   story_points: "customfield_10040"        # pre-existing agile field
-  brd_document_link: "customfield_XXXXX"   # From Phase 1 - fill from JIRA
-  brd_approved_date: "customfield_XXXXX"   # From Phase 1 - fill from JIRA
+  brd_document_link: "customfield_10042"   # From Phase 1
+  brd_approved_date: "customfield_10044"   # From Phase 1
+  brd_owner: "customfield_10043"           # From Phase 1
+
+# Screen association: all fields live on screen 10005 ("PGMAUTO: Kanban Default
+# Issue Screen"), tab 10008 - the shared default screen for non-Bug issue types
+# in PGMAUTO. Story maps here via issue type screen scheme 10001 (DEFAULT).
+# Phase 3 fields were associated on 2026-07-30.
 
 # Integration Points
 integrations:

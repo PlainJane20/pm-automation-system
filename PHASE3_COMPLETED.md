@@ -54,7 +54,8 @@ New fields: User Story, Acceptance Criteria, Technical Approach, BRD Reviewer, S
       (User Story 10153, Acceptance Criteria 10154, Technical Approach 10155,
       BRD Reviewer 10156; Story Points 10040 pre-existing)
 - [x] Copy field IDs into `config/jira-story-fields.json` + workflow YAML — **done**
-- [ ] Add fields to Story Create/Edit/View screens
+- [x] Add fields to Story Create/Edit/View screens — **done 2026-07-30**
+      (added to screen 10005 / tab 10008, the shared PGMAUTO default screen)
 - [ ] Build & publish the **Story BRD Workflow** (Story issue type only)
 - [ ] Deploy updated middleware to Railway (`git push`)
 - [ ] Create Automation rules S0–S5; update BRD Reviewer smart value

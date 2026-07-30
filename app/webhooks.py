@@ -8,7 +8,7 @@ from typing import Dict, Any
 import logging
 
 from app.jira_client import jira_client
-from app.rules.brd_gate import enforce_brd_gate
+from app.rules.brd_gate import enforce_brd_gate, enforce_dor_gate
 from app.rules.auto_classify import auto_classify_ticket
 from app.rules.duplicate_detection import detect_and_flag_duplicates
 from app.db.database import log_automation_execution
@@ -81,7 +81,14 @@ async def handle_issue_transitioned(request: Request, background_tasks: Backgrou
         issue_key = issue.get("key")
         fields = issue.get("fields", {})
 
-        logger.info(f"🔄 Issue transitioned: {issue_key}")
+        # Issue type drives which gate applies (Stories use the Phase 3 DoR gate)
+        issue_type = (fields.get("issuetype") or {}).get("name", "")
+
+        logger.info(f"🔄 Issue transitioned: {issue_key} ({issue_type or 'unknown type'})")
+
+        # Statuses that count as "development started" across JIRA naming variants
+        in_progress_statuses = {"IN_PROGRESS", "In Progress"}
+        ready_for_dev_statuses = {"READY_FOR_DEV", "Ready for Dev", "Ready for Development"}
 
         # Extract transition details
         for item in changelog.get("items", []):
@@ -91,9 +98,15 @@ async def handle_issue_transitioned(request: Request, background_tasks: Backgrou
 
                 logger.info(f"   {from_status} → {to_status}")
 
-                # BRD Gate Enforcement (CRITICAL)
-                if to_status == "IN_PROGRESS" or to_status == "In Progress":
-                    background_tasks.add_task(enforce_brd_gate, issue_key, fields)
+                if issue_type == "Story":
+                    # Phase 3: Definition of Ready gate enforced on the dev-ready
+                    # transitions (BRD_REVIEW → READY_FOR_DEV and → IN_PROGRESS)
+                    if to_status in ready_for_dev_statuses or to_status in in_progress_statuses:
+                        background_tasks.add_task(enforce_dor_gate, issue_key, fields)
+                else:
+                    # Phase 1 BRD gate (legacy / non-Story issue types)
+                    if to_status in in_progress_statuses:
+                        background_tasks.add_task(enforce_brd_gate, issue_key, fields)
 
                 # Add more transition-based rules here
                 # Example: Start SLA timer, send Slack notification, etc.

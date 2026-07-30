@@ -1,0 +1,254 @@
+# JIRA Story Workflow Configuration
+# Phase 3: Story-Level BRD / Definition-of-Ready Workflow
+#
+# JIRA does not support workflow import via YAML, so this file documents the
+# Story workflow for manual configuration in:
+#   Project Settings (PGMAUTO) -> Workflows -> Create workflow
+#
+# Associated with: Story issue type only (Epics use jira-epic-workflow.yaml)
+
+name: "Story BRD Workflow"
+description: "Ensures Stories are provably dev-ready (Definition of Ready) before entering a sprint"
+
+statuses:
+  - name: "TO_DO"
+    category: "To Do"
+    description: "Story created from Epic breakdown, not yet refined"
+
+  - name: "BRD_IN_PROGRESS"
+    category: "In Progress"
+    description: "BA / TPM defining requirements (User Story, Acceptance Criteria, Technical Approach)"
+
+  - name: "BRD_REVIEW"
+    category: "In Progress"
+    description: "Tech Lead reviewing the BRD / requirements before dev commitment"
+
+  - name: "READY_FOR_DEV"
+    category: "To Do"
+    description: "Definition of Ready satisfied - eligible for sprint planning"
+
+  - name: "IN_PROGRESS"
+    category: "In Progress"
+    description: "Developer actively working the Story"
+
+  - name: "CODE_REVIEW"
+    category: "In Progress"
+    description: "Peer review of the implementation (PR open)"
+
+  - name: "QA_TESTING"
+    category: "In Progress"
+    description: "QA validating against Acceptance Criteria"
+
+  - name: "DONE"
+    category: "Done"
+    description: "All acceptance criteria met, merged, and verified"
+
+transitions:
+  # From TO_DO
+  - name: "Start BRD"
+    from: "TO_DO"
+    to: "BRD_IN_PROGRESS"
+    type: "manual"
+    who_can_execute: "BA, TPM"
+    post_functions:
+      - "Assign to BA/TPM defining requirements"
+      - "Add comment: 'Requirements definition started.'"
+
+  # From BRD_IN_PROGRESS
+  - name: "Submit for BRD Review"
+    from: "BRD_IN_PROGRESS"
+    to: "BRD_REVIEW"
+    type: "manual"
+    who_can_execute: "BA, TPM"
+    validators:
+      - "User Story must be populated"
+      - "Acceptance Criteria must be populated"
+      - "Technical Approach must be populated"
+    post_functions:
+      - "Notify BRD Reviewer (Tech Lead) - see Story Rule S1"
+      - "Add comment: 'Requirements submitted for Tech Lead review.'"
+
+  # From BRD_REVIEW  --- DoR GATE ENFORCED HERE ---
+  - name: "Approve to Ready"
+    from: "BRD_REVIEW"
+    to: "READY_FOR_DEV"
+    type: "manual"
+    who_can_execute: "Tech Lead, TPM"
+    dor_gate: true
+    validators:
+      - "Definition of Ready must be complete (validated by Railway middleware)"
+      - "User Story populated"
+      - "Acceptance Criteria populated"
+      - "Technical Approach populated"
+      - "Story Points estimated"
+      - "BRD Document Link populated"
+      - "BRD Approved Date set"
+      - "BRD Reviewer assigned"
+    validator_implementation: "Railway middleware webhook -> app/rules/brd_gate.py::enforce_dor_gate"
+    validator_endpoint: "https://pm-automation-system-production.up.railway.app/webhooks/jira/issue-transitioned"
+    post_functions:
+      - "Send email to reporter/assignee: 'Story is dev-ready'"
+      - "Add comment: 'Definition of Ready satisfied. Eligible for sprint planning.'"
+
+  - name: "Send Back for Rework"
+    from: "BRD_REVIEW"
+    to: "BRD_IN_PROGRESS"
+    type: "manual"
+    who_can_execute: "Tech Lead, TPM"
+    post_functions:
+      - "Add comment: 'BRD returned for rework. See reviewer notes.'"
+
+  # From READY_FOR_DEV --- DoR GATE ALSO ENFORCED (belt-and-suspenders) ---
+  - name: "Start Development"
+    from: "READY_FOR_DEV"
+    to: "IN_PROGRESS"
+    type: "manual"
+    who_can_execute: "Developer"
+    dor_gate: true
+    validators:
+      - "Definition of Ready must be complete (re-validated by Railway middleware)"
+    validator_implementation: "Railway middleware webhook -> app/rules/brd_gate.py::enforce_dor_gate"
+    post_functions:
+      - "Transition parent Epic to IN_EXECUTION (Epic Rule 12)"
+      - "Add comment: 'Development started.'"
+
+  # From IN_PROGRESS
+  - name: "Submit for Code Review"
+    from: "IN_PROGRESS"
+    to: "CODE_REVIEW"
+    type: "manual"
+    who_can_execute: "Developer"
+    validators:
+      - "PR Link should be populated"
+    post_functions:
+      - "Add comment: 'PR open, awaiting peer review.'"
+
+  # From CODE_REVIEW
+  - name: "Pass to QA"
+    from: "CODE_REVIEW"
+    to: "QA_TESTING"
+    type: "manual"
+    who_can_execute: "Reviewer"
+    post_functions:
+      - "Add comment: 'Code review passed. Ready for QA.'"
+
+  - name: "Return to Development"
+    from: "CODE_REVIEW"
+    to: "IN_PROGRESS"
+    type: "manual"
+    who_can_execute: "Reviewer"
+    post_functions:
+      - "Add comment: 'Changes requested in review.'"
+
+  # From QA_TESTING
+  - name: "Mark Done"
+    from: "QA_TESTING"
+    to: "DONE"
+    type: "manual"
+    who_can_execute: "QA"
+    validators:
+      - "Test Results must be 'Pass'"
+    post_functions:
+      - "Add comment: 'All acceptance criteria verified. Story done.'"
+      - "Trigger Epic auto-complete check (Epic Rule 13)"
+
+  - name: "Fail QA"
+    from: "QA_TESTING"
+    to: "IN_PROGRESS"
+    type: "manual"
+    who_can_execute: "QA"
+    validators:
+      - "Test Results = 'Fail'"
+    post_functions:
+      - "Add comment: 'QA failed. Returned to development.'"
+
+# Screen Configurations
+screens:
+  - name: "Story Create Screen"
+    fields:
+      - "Summary (required)"
+      - "Description (required)"
+      - "Epic Link (required)"
+      - "Request Type"
+      - "Priority"
+      - "Assignee"
+
+  - name: "Story BRD Screen"
+    fields:
+      - "User Story (required to leave BRD_IN_PROGRESS)"
+      - "Acceptance Criteria (required to leave BRD_IN_PROGRESS)"
+      - "Technical Approach (required to leave BRD_IN_PROGRESS)"
+      - "Story Points"
+      - "BRD Document Link"
+      - "BRD Approved Date"
+      - "BRD Reviewer"
+
+  - name: "Story Dev Screen"
+    fields:
+      - "PR Link"
+      - "Test Results"
+      - "Story Points"
+
+# Definition of Ready gate
+definition_of_ready:
+  enforced_on_transitions:
+    - "BRD_REVIEW -> READY_FOR_DEV"
+    - "READY_FOR_DEV -> IN_PROGRESS"
+  required_fields:
+    - "User Story"
+    - "Acceptance Criteria"
+    - "Technical Approach"
+    - "Story Points"
+    - "BRD Document Link"
+    - "BRD Approved Date"
+    - "BRD Reviewer"
+  enforcement_model: "document-and-advise"
+  behavior: >
+    The Railway middleware (app/rules/brd_gate.py::enforce_dor_gate) validates the
+    fields, and on violation adds a blocking comment listing each missing item plus
+    the 'dor-gate-blocked' label. The actual transition block is performed by a JIRA
+    Automation rule (see config/jira-story-automation-rules.yaml, Rule S4), which
+    prevents the transition when the 'dor-gate-blocked' label is present.
+
+# Implementation Notes
+implementation:
+  steps:
+    - "JIRA -> Project Settings (PGMAUTO) -> Workflows -> Add workflow -> Create from scratch"
+    - "Name: 'Story BRD Workflow'"
+    - "Add all 8 statuses defined above"
+    - "Create transitions between statuses as documented"
+    - "Add native validators (required fields) to each transition"
+    - "Configure the DoR-gated transitions to call the Railway middleware webhook"
+    - "Create/update Story screens as listed"
+    - "Associate workflow with Story issue type only"
+    - "Publish workflow (map existing Stories to TO_DO during migration)"
+
+  testing:
+    - "Create test Story under an existing Epic (status TO_DO)"
+    - "Advance to BRD_REVIEW with fields blank -> native validator blocks"
+    - "Attempt BRD_REVIEW -> READY_FOR_DEV with DoR incomplete -> middleware comments + label, Automation blocks"
+    - "Fill all DoR fields -> transition succeeds, confirmation comment appears"
+    - "Advance through IN_PROGRESS -> CODE_REVIEW -> QA_TESTING -> DONE"
+    - "Verify parent Epic auto-transitions to IN_EXECUTION on first Story start"
+
+# Custom Field IDs (created via create_phase3_fields.py on 2026-07-30)
+custom_fields:
+  user_story: "customfield_10153"
+  acceptance_criteria: "customfield_10154"
+  technical_approach: "customfield_10155"
+  brd_reviewer: "customfield_10156"
+  story_points: "customfield_10040"        # pre-existing agile field
+  brd_document_link: "customfield_XXXXX"   # From Phase 1 - fill from JIRA
+  brd_approved_date: "customfield_XXXXX"   # From Phase 1 - fill from JIRA
+
+# Integration Points
+integrations:
+  - name: "Railway Middleware"
+    description: "Validates Definition of Ready on DoR-gated transitions"
+    file: "app/webhooks.py"
+    function: "handle_issue_transitioned"
+    rule: "app/rules/brd_gate.py::enforce_dor_gate"
+
+  - name: "JIRA Automation"
+    description: "Notifications + transition block based on dor-gate-blocked label"
+    file: "config/jira-story-automation-rules.yaml"

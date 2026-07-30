@@ -1,0 +1,272 @@
+# JIRA Story Automation Rules
+# Phase 3: Story-Level BRD / Definition-of-Ready Automation
+#
+# Configure in: JIRA -> Project Settings (PGMAUTO) -> Automation -> Create rule
+#
+# Prerequisites:
+# - Story workflow created (see jira-story-workflow.yaml)
+# - Story DoR fields created (run create_phase3_fields.py)
+# - Railway middleware deployed with enforce_dor_gate (app/rules/brd_gate.py)
+#
+# Rule numbering: S0..S5 (Story). Epic rules are 10..17 (jira-epic-automation-rules.yaml).
+
+automation_rules:
+  # ========================================
+  # RULE S0: Apply Story Template on Creation
+  # ========================================
+  - rule_id: S0
+    name: "Story: Apply BRD Template on Creation"
+    description: "Populates a new Story's description with the DoR template when created under an Epic"
+    enabled: true
+
+    trigger:
+      type: "Issue created"
+      filter:
+        issue_type: "Story"
+        project: "PGMAUTO"
+
+    conditions:
+      - type: "Issue fields condition"
+        field: "Parent"
+        condition: "is not empty"
+
+      - type: "Issue fields condition"
+        field: "Description"
+        condition: "is empty"
+
+    actions:
+      - type: "Edit issue"
+        field: "Description"
+        value: |
+          ## User Story
+          As a [role], I want [feature], so that [benefit].
+
+          ## Acceptance Criteria
+          - [ ] Criterion 1 (testable)
+          - [ ] Criterion 2 (testable)
+          - [ ] Criterion 3 (testable)
+
+          ## Technical Approach
+          [High-level implementation plan]
+
+          ## Dependencies
+          [Link blocking issues]
+
+          ## Testing Notes
+          [Special testing considerations]
+
+          ---
+          **Epic:** {{issue.parent.key}} - {{issue.parent.summary}}
+          **Requested by:** {{issue.parent.reporter.displayName}}
+
+      - type: "Add comment"
+        comment: |
+          📝 **Story created under {{issue.parent.key}}**
+
+          The BRD template has been applied. Please complete the User Story,
+          Acceptance Criteria, and Technical Approach before requesting review.
+
+  # ========================================
+  # RULE S1: Notify Tech Lead on BRD Review
+  # ========================================
+  - rule_id: S1
+    name: "Story: Notify Tech Lead for BRD Review"
+    description: "Emails the BRD Reviewer when a Story enters BRD_REVIEW"
+    enabled: true
+
+    trigger:
+      type: "Issue transitioned"
+      to_status: "BRD_REVIEW"
+      for:
+        issue_type: "Story"
+        project: "PGMAUTO"
+
+    actions:
+      - type: "Send email"
+        to: "{{issue.BRD Reviewer.emailAddress}}"
+        subject: "🔍 BRD review requested: {{issue.key}}"
+        body: |
+          Hello,
+
+          A Story is ready for your BRD / requirements review.
+
+          Story: {{issue.key}} - {{issue.summary}}
+          Epic: {{issue.parent.key}} - {{issue.parent.summary}}
+
+          Please review the User Story, Acceptance Criteria, and Technical Approach,
+          then either approve it to READY_FOR_DEV or send it back for rework.
+
+          View Story: {{issue.url}}
+
+      - type: "Add comment"
+        comment: |
+          🔍 **Awaiting Tech Lead review**
+
+          {{issue.BRD Reviewer.displayName}} has been notified to review the requirements.
+
+  # ========================================
+  # RULE S2: Notify on Story Dev-Ready
+  # ========================================
+  - rule_id: S2
+    name: "Story: Notify When Dev-Ready"
+    description: "Notifies reporter/assignee when a Story reaches READY_FOR_DEV (DoR passed)"
+    enabled: true
+
+    trigger:
+      type: "Issue transitioned"
+      to_status: "READY_FOR_DEV"
+      for:
+        issue_type: "Story"
+        project: "PGMAUTO"
+
+    actions:
+      - type: "Add comment"
+        comment: |
+          ✅ **Story is Dev-Ready**
+
+          Definition of Ready satisfied. This Story is eligible for sprint planning.
+
+          Story Points: {{issue.Story Points}}
+          Reviewer: {{issue.BRD Reviewer.displayName}}
+
+      - type: "Add label"
+        label: "dev-ready"
+
+      - type: "Remove label"
+        label: "dor-gate-blocked"
+
+  # ========================================
+  # RULE S3: DoR Gate - Trigger Middleware Validation
+  # ========================================
+  - rule_id: S3
+    name: "Story: DoR Gate Validation (Middleware)"
+    description: "Calls the Railway middleware to validate Definition of Ready on dev-ready transitions"
+    enabled: true
+
+    trigger:
+      type: "Issue transitioned"
+      to_status: ["READY_FOR_DEV", "IN_PROGRESS"]
+      for:
+        issue_type: "Story"
+        project: "PGMAUTO"
+
+    actions:
+      - type: "Send web request"
+        url: "https://pm-automation-system-production.up.railway.app/webhooks/jira/issue-transitioned"
+        method: "POST"
+        headers:
+          Content-Type: "application/json"
+        body: |
+          {
+            "issue": {
+              "key": "{{issue.key}}",
+              "fields": { "issuetype": { "name": "Story" } }
+            },
+            "changelog": {
+              "items": [
+                { "field": "status", "fromString": "{{fromStatus.name}}", "toString": "{{toStatus.name}}" }
+              ]
+            }
+          }
+        # The middleware evaluates DoR and, on violation, adds the
+        # 'dor-gate-blocked' label + a blocking comment. Rule S4 then blocks
+        # the transition when that label is present.
+
+  # ========================================
+  # RULE S4: Block Transition When DoR Not Met
+  # ========================================
+  - rule_id: S4
+    name: "Story: Block Dev-Ready When DoR Incomplete"
+    description: "Reverts the transition when the middleware flagged a DoR violation"
+    enabled: true
+    note: >
+      JIRA Automation cannot cancel a transition mid-flight. This rule reacts to the
+      'dor-gate-blocked' label (set by the middleware) by transitioning the Story back
+      to BRD_IN_PROGRESS and notifying the author. For a hard synchronous block, use a
+      workflow validator instead (see jira-story-workflow.yaml validator_endpoint).
+
+    trigger:
+      type: "Field value changed"
+      field: "Labels"
+      for:
+        issue_type: "Story"
+        project: "PGMAUTO"
+
+    conditions:
+      - type: "Issue has label"
+        label: "dor-gate-blocked"
+
+      - type: "Issue fields condition"
+        field: "Status"
+        condition: "is one of"
+        value: ["READY_FOR_DEV", "IN_PROGRESS"]
+
+    actions:
+      - type: "Transition issue"
+        transition: "Send Back for Rework"   # -> BRD_IN_PROGRESS
+
+      - type: "Send email"
+        to: "{{issue.assignee.emailAddress}}"
+        subject: "⛔ {{issue.key}} not dev-ready - Definition of Ready incomplete"
+        body: |
+          The Story was returned because its Definition of Ready is incomplete.
+
+          Story: {{issue.key}} - {{issue.summary}}
+
+          See the automated comment on the Story for the list of missing fields,
+          complete them, then request review again.
+
+          View Story: {{issue.url}}
+
+  # ========================================
+  # RULE S5: PR Link -> Code Review
+  # ========================================
+  - rule_id: S5
+    name: "Story: Move to Code Review on PR Link"
+    description: "Advances an in-progress Story to CODE_REVIEW when a PR Link is added"
+    enabled: false   # enable once GitHub webhook populates PR Link
+
+    trigger:
+      type: "Field value changed"
+      field: "PR Link"
+      for:
+        issue_type: "Story"
+        project: "PGMAUTO"
+
+    conditions:
+      - type: "Issue fields condition"
+        field: "Status"
+        condition: "equals"
+        value: "IN_PROGRESS"
+
+      - type: "Issue fields condition"
+        field: "PR Link"
+        condition: "is not empty"
+
+    actions:
+      - type: "Transition issue"
+        transition: "Submit for Code Review"
+
+      - type: "Add comment"
+        comment: "🔀 PR linked ({{issue.PR Link}}). Moved to Code Review."
+
+# Implementation Instructions
+implementation:
+  location: "JIRA -> Project Settings (PGMAUTO) -> Automation"
+  steps:
+    - "Create each rule above via 'Create rule'"
+    - "For Rule S3/S4, confirm the Railway middleware URL is reachable"
+    - "Update {{issue.BRD Reviewer.emailAddress}} smart value against your field name"
+    - "Test with a dummy Story under an existing Epic"
+    - "Enable each rule once verified"
+
+  testing:
+    - "Create Story under Epic -> S0 applies template"
+    - "Enter BRD_REVIEW -> S1 emails Tech Lead"
+    - "Approve to READY_FOR_DEV with DoR incomplete -> S3 flags, S4 reverts to BRD_IN_PROGRESS"
+    - "Complete all DoR fields -> approve -> S2 marks dev-ready, clears dor-gate-blocked"
+
+notes:
+  - "Smart value for a named field with spaces: {{issue.User Story}} etc."
+  - "The 'document-and-advise' model means the middleware never blocks directly; S4 (or a workflow validator) enforces the block."
+  - "For a true synchronous block, configure the DoR transition with a workflow validator hitting the middleware instead of relying on the label round-trip."

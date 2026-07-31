@@ -11,10 +11,13 @@ import requests
 import json
 from typing import Dict, List
 
-# JIRA Configuration (from .env)
-JIRA_URL = "https://nksaidev.atlassian.net"
-JIRA_EMAIL = "nks.ai.dev@gmail.com"
-JIRA_API_TOKEN = "***JIRA_TOKEN_REMOVED***"
+# JIRA Configuration — read from .env via app.config (never hardcode secrets)
+from app.config import get_settings
+
+_settings = get_settings()
+JIRA_URL = _settings.JIRA_URL
+JIRA_EMAIL = _settings.JIRA_EMAIL
+JIRA_API_TOKEN = _settings.JIRA_API_TOKEN
 
 # Phase 2 Fields Configuration
 FIELDS = [

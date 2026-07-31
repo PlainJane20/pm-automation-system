@@ -86,26 +86,32 @@ async def handle_issue_transitioned(request: Request, background_tasks: Backgrou
 
         logger.info(f"🔄 Issue transitioned: {issue_key} ({issue_type or 'unknown type'})")
 
-        # Statuses that count as "development started" across JIRA naming variants
-        in_progress_statuses = {"IN_PROGRESS", "In Progress"}
-        ready_for_dev_statuses = {"READY_FOR_DEV", "Ready for Dev", "Ready for Development"}
+        # Statuses that count as "development started" / "dev-ready", normalized so
+        # they match regardless of JIRA spacing or casing ("READY FOR DEV",
+        # "Ready for Dev", "READY_FOR_DEV" all collapse to the same key).
+        def _norm_status(s: str) -> str:
+            return (s or "").strip().upper().replace(" ", "_").replace("/", "_")
+
+        in_progress_statuses = {"IN_PROGRESS"}
+        ready_for_dev_statuses = {"READY_FOR_DEV", "READY_FOR_DEVELOPMENT"}
 
         # Extract transition details
         for item in changelog.get("items", []):
             if item.get("field") == "status":
                 from_status = item.get("fromString")
                 to_status = item.get("toString")
+                to_status_norm = _norm_status(to_status)
 
                 logger.info(f"   {from_status} → {to_status}")
 
                 if issue_type == "Story":
                     # Phase 3: Definition of Ready gate enforced on the dev-ready
                     # transitions (BRD_REVIEW → READY_FOR_DEV and → IN_PROGRESS)
-                    if to_status in ready_for_dev_statuses or to_status in in_progress_statuses:
+                    if to_status_norm in ready_for_dev_statuses or to_status_norm in in_progress_statuses:
                         background_tasks.add_task(enforce_dor_gate, issue_key, fields)
                 else:
                     # Phase 1 BRD gate (legacy / non-Story issue types)
-                    if to_status in in_progress_statuses:
+                    if to_status_norm in in_progress_statuses:
                         background_tasks.add_task(enforce_brd_gate, issue_key, fields)
 
                 # Add more transition-based rules here

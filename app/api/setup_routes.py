@@ -85,6 +85,42 @@ PHASE2_FIELDS = [
 ]
 
 
+# Phase 3 Story Definition-of-Ready Custom Fields
+# BRD Document Link / BRD Approved Date already exist from Phase 1 and are NOT recreated.
+PHASE3_FIELDS = [
+    {
+        "name": "User Story",
+        "description": "As a [role], I want [feature], so that [benefit]",
+        "type": "com.atlassian.jira.plugin.system.customfieldtypes:textarea",
+        "searcherKey": "com.atlassian.jira.plugin.system.customfieldtypes:textsearcher",
+    },
+    {
+        "name": "Acceptance Criteria",
+        "description": "Testable, bullet-listed conditions that define done",
+        "type": "com.atlassian.jira.plugin.system.customfieldtypes:textarea",
+        "searcherKey": "com.atlassian.jira.plugin.system.customfieldtypes:textsearcher",
+    },
+    {
+        "name": "Technical Approach",
+        "description": "High-level implementation plan agreed with the Tech Lead",
+        "type": "com.atlassian.jira.plugin.system.customfieldtypes:textarea",
+        "searcherKey": "com.atlassian.jira.plugin.system.customfieldtypes:textsearcher",
+    },
+    {
+        "name": "BRD Reviewer",
+        "description": "Tech Lead who reviewed and signed off the requirements",
+        "type": "com.atlassian.jira.plugin.system.customfieldtypes:userpicker",
+        "searcherKey": "com.atlassian.jira.plugin.system.customfieldtypes:userpickergroupsearcher",
+    },
+    {
+        "name": "Story Points",
+        "description": "Effort estimate in story points",
+        "type": "com.atlassian.jira.plugin.system.customfieldtypes:float",
+        "searcherKey": "com.atlassian.jira.plugin.system.customfieldtypes:numberrange",
+    },
+]
+
+
 def create_custom_field(field_config: Dict) -> Dict:
     """Create a custom field in JIRA via REST API"""
 
@@ -311,4 +347,101 @@ async def cleanup_phase2_fields():
         "failed_count": len(failed),
         "deleted": deleted,
         "failed": failed
+    }
+
+
+def _get_existing_custom_fields() -> Dict[str, str]:
+    """Return {field_name: field_id} for all existing custom fields."""
+    url = f"{settings.JIRA_URL}/rest/api/3/field"
+    auth = (settings.JIRA_EMAIL, settings.JIRA_API_TOKEN)
+    response = requests.get(url, headers={"Accept": "application/json"}, auth=auth)
+    response.raise_for_status()
+    return {f["name"]: f["id"] for f in response.json() if f.get("custom", False)}
+
+
+@router.post("/phase3-fields")
+async def create_phase3_fields():
+    """
+    Create Phase 3 Story Definition-of-Ready custom fields (idempotent).
+
+    Fields that already exist (e.g. Story Points, or Phase 1 BRD fields) are
+    detected and skipped. Run once during Phase 3 setup.
+    """
+
+    logger.info("🚀 Starting Phase 3 field creation...")
+
+    try:
+        existing = _get_existing_custom_fields()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to reach JIRA: {e}")
+
+    results = {"created": [], "skipped": [], "failed": [], "field_ids": {}}
+
+    for field_config in PHASE3_FIELDS:
+        name = field_config["name"]
+
+        if name in existing:
+            results["skipped"].append(name)
+            results["field_ids"][name] = existing[name]
+            continue
+
+        result = create_custom_field(field_config)
+        if result["success"]:
+            results["created"].append(result["name"])
+            results["field_ids"][result["name"]] = result["id"]
+        elif result.get("skipped"):
+            results["skipped"].append(result["name"])
+        else:
+            results["failed"].append({"name": result["name"], "error": result["error"]})
+
+    summary = {
+        "total_fields": len(PHASE3_FIELDS),
+        "created_count": len(results["created"]),
+        "skipped_count": len(results["skipped"]),
+        "failed_count": len(results["failed"]),
+        "success": len(results["failed"]) == 0,
+    }
+
+    logger.info(f"✅ Phase 3 fields setup complete: {summary}")
+
+    return {
+        "summary": summary,
+        "results": results,
+        "reference_only_not_created": ["BRD Document Link", "BRD Approved Date"],
+        "next_steps": [
+            "1. Copy the field IDs below into config/jira-story-fields.json",
+            "2. Associate fields with Story Create/Edit/View screens",
+            "3. Create the Story workflow (config/jira-story-workflow.yaml)",
+            "4. Create Story automation rules (config/jira-story-automation-rules.yaml)",
+            "5. Deploy the updated Railway middleware (DoR gate)",
+        ],
+        "field_ids_to_document": results["field_ids"],
+    }
+
+
+@router.get("/phase3-fields/check")
+async def check_phase3_fields():
+    """Check which Phase 3 Story fields already exist."""
+
+    try:
+        existing = _get_existing_custom_fields()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to reach JIRA: {e}")
+
+    field_status = {}
+    for field_config in PHASE3_FIELDS:
+        name = field_config["name"]
+        field_status[name] = {
+            "exists": name in existing,
+            "id": existing.get(name),
+        }
+
+    existing_count = sum(1 for s in field_status.values() if s["exists"])
+
+    return {
+        "total_required": len(PHASE3_FIELDS),
+        "existing": existing_count,
+        "missing": len(PHASE3_FIELDS) - existing_count,
+        "all_exist": existing_count == len(PHASE3_FIELDS),
+        "fields": field_status,
     }

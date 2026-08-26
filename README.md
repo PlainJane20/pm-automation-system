@@ -2,7 +2,7 @@
 
 # Enterprise PM Automation System
 
-### *Intelligent automation platform reducing Epic intake from 30 minutes to 30 seconds*
+### *A reference implementation for reducing Epic intake from 30 minutes to a modeled 30-second automated path*
 
 <br>
 
@@ -17,7 +17,7 @@
 **[Executive Summary](#executive-summary)** • 
 **[Technical Architecture](#technical-architecture)** • 
 **[Implementation](#implementation-roadmap)** • 
-**[Business Impact](#quantified-business-impact)** • 
+**[Business Impact](#modeled-business-impact)** •
 **[Documentation](#documentation)**
 
 <br>
@@ -32,7 +32,7 @@
 <tr>
 <td width="70%">
 
-This enterprise-grade program management automation platform transforms manual, error-prone stakeholder intake processes into a streamlined, automated workflow. By integrating Google Cloud Platform, JIRA Cloud, and FastAPI middleware, the system delivers measurable improvements in processing speed, data accuracy, and stakeholder satisfaction.
+This program-management automation reference implementation transforms manual stakeholder intake into a structured workflow. It demonstrates how Google Workspace, Jira Cloud, and FastAPI middleware can reduce handoffs, validate required data, and make lifecycle state visible.
 
 **Core Capabilities:**
 - Automated Epic creation from stakeholder intake forms
@@ -45,13 +45,13 @@ This enterprise-grade program management automation platform transforms manual, 
 
 <img src="https://img.icons8.com/fluency/96/000000/workflow.png" width="80"/>
 
-**Impact Overview**
+**Modeled Impact Overview**
 
 <table>
 <tr><td><b>Speed</b></td><td>99.7% faster</td></tr>
-<tr><td><b>Accuracy</b></td><td>100%</td></tr>
-<tr><td><b>Satisfaction</b></td><td>+27%</td></tr>
-<tr><td><b>ROI</b></td><td>$135k/year</td></tr>
+<tr><td><b>Validation target</b></td><td>100%</td></tr>
+<tr><td><b>Satisfaction target</b></td><td>+27%</td></tr>
+<tr><td><b>Modeled value</b></td><td>$135k/year</td></tr>
 </table>
 
 </td>
@@ -60,14 +60,28 @@ This enterprise-grade program management automation platform transforms manual, 
 
 ---
 
-## Quantified Business Impact
+## Evidence posture
+
+The workflow, configuration, API integration patterns, and project artifacts are implemented in this repository. Business-impact figures below are **modeled scenario estimates** based on stated baseline assumptions; they are not production telemetry, audited savings, or measured user outcomes. A production deployment should establish baselines, instrument cycle time and error rates, validate adoption, and have Finance confirm any cashable benefit.
+
+## Competencies demonstrated
+
+| Competency | Observable evidence |
+|:--|:--|
+| Program operating-model design | Structured intake, lifecycle states, approvals, roadmap visibility, and notifications |
+| Systems integration | Google Forms/Sheets, Apps Script, Jira REST, FastAPI, PostgreSQL, and Slack patterns |
+| Governance by design | Validation gates, audit records, capacity limits, and explicit workflow transitions |
+| Automation architecture | Event-driven rules reduce manual reconstruction across the Epic lifecycle |
+| Value framing | Time, quality, capacity, and modeled economics are separated from implementation evidence |
+
+## Modeled Business Impact
 
 <details open>
 <summary><b>📊 Click to expand performance metrics</b></summary>
 
 <br>
 
-### Key Performance Indicators
+### Illustrative Key Performance Indicators
 
 | **Metric** | **Before** | **After** | **Improvement** |
 |:-----------|:-----------|:----------|:----------------|
@@ -92,7 +106,7 @@ This enterprise-grade program management automation platform transforms manual, 
 | Stakeholders | Follow-up inquiries | 10 hours | 520 hours |
 | **TOTAL** | | **26 hours/week** | **1,352 hours/year** |
 
-**Return on Investment:** ~$135,000 annually in reclaimed productivity (calculated at $100/hour average)
+**Modeled productivity value:** ~$135,000 annually if 1,352 hours are actually released and valued at the illustrative $100/hour assumption. Reclaimed time is capacity, not automatically cashable savings.
 
 <br>
 
@@ -439,9 +453,9 @@ gantt
 <td>1 week<br/>(20 hours)</td>
 <td><span style="background-color: #36B37E; color: white; padding: 2px 8px; border-radius: 3px;">✓ COMPLETE</span></td>
 <td>
-4 Epics created<br/>
-100% accuracy<br/>
-67% faster
+4 sample Epics created<br/>
+Required fields validated<br/>
+Cycle-time path demonstrated
 </td>
 </tr>
 
@@ -456,9 +470,9 @@ gantt
 <td>2 weeks<br/>(40 hours)</td>
 <td><span style="background-color: #36B37E; color: white; padding: 2px 8px; border-radius: 3px;">✓ COMPLETE</span></td>
 <td>
-99.7% faster<br/>
-+27% satisfaction<br/>
-100% automated
+Modeled cycle-time reduction<br/>
+Satisfaction target defined<br/>
+7 automation rules configured
 </td>
 </tr>
 
@@ -530,7 +544,7 @@ Target: <15% variance
 
 **Technical Specs:**
 - **Response Time:** < 30 seconds
-- **Data Accuracy:** 100%
+- **Validation:** 12 required fields enforced
 - **Field Validation:** 12 required fields
 - **API Integration:** JIRA REST v3
 - **Error Handling:** Automatic retry (3x)
@@ -561,12 +575,12 @@ Target: <15% variance
 </td>
 <td width="40%">
 
-**Automation Coverage:**
-- **Manual Transitions:** 40%
-- **Auto Transitions:** 60%
-- **Email Notifications:** 100%
-- **State Validation:** 100%
-- **Audit Logging:** 100%
+**Configured Automation Coverage:**
+- **Manual Transitions:** 40% of the modeled lifecycle
+- **Auto Transitions:** 60% of the modeled lifecycle
+- **Email Notifications:** configured for defined notification events
+- **State Validation:** configured for governed transitions
+- **Audit Logging:** designed into the workflow path
 
 **SLAs:**
 - Welcome email: < 5 sec
@@ -893,8 +907,8 @@ For inquiries regarding licensing, collaboration, or implementation consulting, 
 
 ![Lines of Code](https://img.shields.io/badge/Lines_of_Code-4,200+-blue?style=flat-square)
 ![Documentation](https://img.shields.io/badge/Documentation-Complete-green?style=flat-square)
-![Test Coverage](https://img.shields.io/badge/Test_Coverage-100%25-brightgreen?style=flat-square)
-![Production Status](https://img.shields.io/badge/Status-Production-success?style=flat-square)
+![Evidence](https://img.shields.io/badge/Business_metrics-Modeled-f59e0b?style=flat-square)
+![Status](https://img.shields.io/badge/Status-Reference_Implementation-6554C0?style=flat-square)
 
 <br>
 

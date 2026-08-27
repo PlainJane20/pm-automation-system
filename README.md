@@ -1,3 +1,5 @@
+<img src="docs/pm-automation-system-banner.svg" alt="Enterprise PM Automation — Program Workflow Automation" width="100%" />
+
 <div align="center">
 
 # Enterprise PM Automation System

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" role="img" aria-labelledby="title description">
+  <title id="title">Enterprise PM Automation</title>
+  <desc id="description">Connecting governed intake, Jira lifecycle automation, and portfolio visibility.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#081a2a"/>
+      <stop offset="0.56" stop-color="#12354d"/>
+      <stop offset="1" stop-color="#2563eb" stop-opacity=".72"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#c4b5fd" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#c4b5fd" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#030b13" flood-opacity=".38"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="320" rx="24" fill="url(#bg)"/>
+  <circle cx="1035" cy="55" r="230" fill="url(#glow)"/>
+  <g opacity=".16" fill="none" stroke="#c4b5fd" stroke-width="1.2" color="#c4b5fd"><rect x="776" y="74" width="96" height="46" rx="12"/><rect x="928" y="137" width="96" height="46" rx="12"/><rect x="1080" y="200" width="96" height="46" rx="12"/><path d="M872 97h34l22 40M1024 160h34l22 40"/><path d="M897 128l9-31-31 8M1049 191l9-31-31 8"/></g>
+  <g transform="translate(74 68)" filter="url(#shadow)">
+    <rect width="88" height="88" rx="22" fill="#102f45" stroke="#c4b5fd" stroke-opacity=".58"/>
+    <g fill="none" stroke="#c4b5fd" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" color="#c4b5fd"><rect x="11" y="13" width="22" height="22" rx="5"/><rect x="55" y="13" width="22" height="22" rx="5"/><rect x="33" y="55" width="22" height="22" rx="5"/><path d="M33 24h22M66 35v10L50 55M22 35v10l16 10"/></g>
+  </g>
+  <text x="190" y="112" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="44" font-weight="750" letter-spacing="-1">Enterprise PM Automation</text>
+  <text x="192" y="153" fill="#c4b5fd" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" letter-spacing="2.5">PROGRAM WORKFLOW AUTOMATION</text>
+  <text x="75" y="225" fill="#dcebf0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="21">Connecting governed intake, Jira lifecycle automation,</text>
+  <text x="75" y="258" fill="#dcebf0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="21">and portfolio visibility.</text>
+  <g transform="translate(846 168)" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700"><g transform="translate(0 0)"><rect width="84" height="42" rx="21" fill="#ffffff" fill-opacity=".1" stroke="#ffffff" stroke-opacity=".2"/><text x="42" y="26" text-anchor="middle" fill="#edf7fa">Jira Cloud</text></g><g transform="translate(94 0)"><rect width="108" height="42" rx="21" fill="#ffffff" fill-opacity=".1" stroke="#ffffff" stroke-opacity=".2"/><text x="54" y="26" text-anchor="middle" fill="#edf7fa">workflow rules</text></g><g transform="translate(212 0)"><rect width="102" height="42" rx="21" fill="#ffffff" fill-opacity=".1" stroke="#ffffff" stroke-opacity=".2"/><text x="51" y="26" text-anchor="middle" fill="#edf7fa">modeled value</text></g></g>
+</svg>

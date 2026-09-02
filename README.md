@@ -28,15 +28,14 @@
 
 ---
 
-> **Why this repo exists:** built as a self-learning project to get hands-on
-> with governed Jira Epic intake, lifecycle automation, and capacity
-> planning patterns — not positioned to compete with mature Jira
-> Marketplace apps (BigPicture, Structure.Gantt, Jira's own Advanced
-> Roadmaps) that have years of production polish and thousands of paying
-> teams behind them. Treat the design/implementation as the evidence;
-> treat the "Modeled Business Impact" section below exactly as its name
-> says — a modeled scenario, not a claim this replaced or could replace
-> an established tool.
+> **Why this repo exists:** hands-on practice designing governed Jira Epic
+> intake, lifecycle automation, and capacity-planning logic end to end —
+> the workflow, validation gates, and integration patterns here are the
+> evidence of that. Mature Jira Marketplace apps (BigPicture,
+> Structure.Gantt, Jira's own Advanced Roadmaps) already cover this
+> ground in production at scale; the "Modeled Business Impact" section
+> below is exactly what its name says — a modeled scenario demonstrating
+> the design's reasoning, not a claim this replaces an established tool.
 
 ## Executive Summary
 

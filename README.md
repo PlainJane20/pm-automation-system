@@ -30,10 +30,7 @@
 
 > **Why this repo exists:** built as a self-learning project to get hands-on
 > with governed Jira Epic intake, lifecycle automation, and capacity
-> planning patterns — not positioned to compete with mature Jira
-> Marketplace apps (BigPicture, Structure.Gantt, Jira's own Advanced
-> Roadmaps) that have years of production polish and thousands of paying
-> teams behind them. Treat the design/implementation as the evidence;
+> planning patterns. Treat the design/implementation as the evidence;
 > treat the "Modeled Business Impact" section below exactly as its name
 > says — a modeled scenario, not a claim this replaced or could replace
 > an established tool.

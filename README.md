@@ -31,11 +31,19 @@
 > **Why this repo exists:** hands-on practice designing governed Jira Epic
 > intake, lifecycle automation, and capacity-planning logic end to end —
 > the workflow, validation gates, and integration patterns here are the
-> evidence of that. Mature Jira Marketplace apps (BigPicture,
-> Structure.Gantt, Jira's own Advanced Roadmaps) already cover this
-> ground in production at scale; the "Modeled Business Impact" section
-> below is exactly what its name says — a modeled scenario demonstrating
-> the design's reasoning, not a claim this replaces an established tool.
+> evidence of that. The "Modeled Business Impact" section below is
+> exactly what its name says — a modeled scenario demonstrating the
+> design's reasoning, not a claim this replaces an established tool.
+
+> **Related work in this portfolio:** this is the Jira-intake foundation
+> for a small connected series. [exec-status-rollup](https://github.com/PlainJane20/exec-status-rollup)
+> reads this same Jira project (PGMAUTO) and turns it into an executive
+> RAG rollup; [critical-path-radar](https://github.com/PlainJane20/critical-path-radar)
+> runs CPM scheduling math over the same dependency data;
+> [agent-control-tower](https://github.com/PlainJane20/agent-control-tower)
+> is the governance layer retrofitted onto the live agents in this
+> series. See [exec-status-rollup](https://github.com/PlainJane20/exec-status-rollup)'s
+> README for how the pieces connect end to end.
 
 ## Executive Summary
 

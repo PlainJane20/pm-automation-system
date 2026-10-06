@@ -41,8 +41,9 @@
 > RAG rollup; [critical-path-radar](https://github.com/PlainJane20/critical-path-radar)
 > runs CPM scheduling math over the same dependency data;
 > [agent-control-tower](https://github.com/PlainJane20/agent-control-tower)
-> is the governance layer retrofitted onto the live agents in this
-> series. See [exec-status-rollup](https://github.com/PlainJane20/exec-status-rollup)'s
+> is a governance layer that two of the agents in this
+> series can optionally import (slack-daily-brief, exec-status-rollup); it
+> does not govern this repo. See [exec-status-rollup](https://github.com/PlainJane20/exec-status-rollup)'s
 > README for how the pieces connect end to end.
 
 ## Executive Summary
@@ -55,7 +56,7 @@ This program-management automation reference implementation transforms manual st
 
 **Core Capabilities:**
 - Automated Epic creation from stakeholder intake forms
-- Intelligent workflow orchestration with 7 automation rules
+- Rules-based workflow automation: 7 Jira Automation rules plus fixed webhook rules in the FastAPI middleware (no AI planning; see [Architecture pattern](#architecture-pattern))
 - Real-time roadmap visualization and capacity planning
 - Proactive stakeholder communication at every lifecycle stage
 
@@ -88,8 +89,8 @@ The workflow, configuration, API integration patterns, and project artifacts are
 **Not an agent: an event-driven workflow/rules engine (webhook-triggered), with optional LLM assist that is off by default.** `app/webhooks.py` receives Jira events and schedules fixed rule functions in `app/rules/` (`brd_gate.py`, `stale_cleanup.py`, `auto_classify.py`, `duplicate_detection.py`). The README's "intelligent workflow orchestration" means these hard-coded rules; there is no planning, loop or autonomous decision-making.
 
 - **Deterministic vs model-driven:** The rules, gates and Jira transitions are deterministic. Only `auto_classify.py` and `duplicate_detection.py` can call OpenAI (a chat model and embeddings), and only when `ENABLE_AI_CLASSIFICATION` is on and `OPENAI_API_KEY` is set. Both fall back to keyword and text matching otherwise.
-- **Human gate:** The BRD and Definition-of-Ready gates (`brd_gate.py`) are "document-and-advise": the code comments and labels on a violation, and the Jira Automation rule performs the actual block. Humans do the approvals in Jira.
-- **Honest limit:** It reacts to events with fixed rules and cannot handle a case no rule covers.
+- **Human gate:** The BRD and Definition-of-Ready gates (`brd_gate.py`) are "document-and-advise": the code comments and labels on a violation, and the Jira Automation rule performs the actual block. Humans do the approvals in Jira. The Python side never blocks a transition itself; the block is a Jira Automation rule (rule S4 in `config/jira-story-automation-rules.yaml`) that reverts the transition after it has happened, when it sees the `dor-gate-blocked` label. That YAML is the specification in this repo, and whether the rule is enabled in a live Jira site cannot be verified from the code.
+- **Honest limit:** It reacts to events with fixed rules and cannot handle a case no rule covers. There are no automated tests in this repo (no `tests/` directory), so none of the rules, gates or the optional OpenAI paths have unit coverage. Capacity limits are not implemented in `app/` (see Validation Rules below), and `app/integrations/slack.py` is not called by any webhook handler.
 
 ## Competencies demonstrated
 
@@ -186,8 +187,8 @@ graph TB
     subgraph "Layer 6: Middleware & Governance"
         J1[🚂 Railway<br/>FastAPI Server]
         J1 -->|Validates| J2[📝 BRD Gate]
-        J1 -->|Monitors| J3[📊 Capacity Limits]
-        J1 -->|Alerts| J4[💬 Slack Integration]
+        J1 -->|Monitors| J3[📊 Capacity Limits<br/>design only]
+        J1 -->|Alerts| J4[💬 Slack Integration<br/>module present, not wired]
     end
     
     E1 -.->|Webhooks| J1
@@ -675,8 +676,8 @@ Target: <15% variance
 <td width="40%">
 
 **Validation Rules:**
-- Capacity alert at 80% utilization
-- Block scheduling at 100% capacity
+- Capacity alert at 80% utilization (specified in the Jira Automation YAML, which expects the middleware to set a `capacity-warning` label; no capacity code exists in `app/`)
+- Block scheduling at 100% capacity (design target, not implemented in this repo's code)
 - ROI calculation: Value ÷ Complexity
 - Risk score aggregation
 - Quarter-over-quarter trending
@@ -721,7 +722,7 @@ Agile Methodologies • Scrum Framework • Kanban System • Roadmap Planning �
 <tr>
 <td><b>Software Development</b></td>
 <td>
-Python 3.9+ • FastAPI Framework • RESTful API Design • Webhook Implementation • Google Apps Script (JavaScript) • SQL • PostgreSQL • JSON Schema Validation • Git Version Control • GitHub Workflows • Code Documentation • Unit Testing
+Python 3.9+ • FastAPI Framework • RESTful API Design • Webhook Implementation • Google Apps Script (JavaScript) • SQL • PostgreSQL • JSON Schema Validation • Git Version Control • GitHub Workflows • Code Documentation
 </td>
 </tr>
 
@@ -779,7 +780,7 @@ CI/CD Concepts • Environment Variables • Secret Management (API Tokens) • 
 pm-automation-system/
 │
 ├── 📄 README.md                          ← Portfolio-ready documentation
-├── 📊 PHASE1_COMPLETE.md                 ← Phase 1 technical details
+├── 📊 COMPLETED_PHASE1.md                ← Phase 1 technical details
 ├── 📊 PHASE2_COMPLETED.md                ← Phase 2 implementation summary
 │
 ├── 🐍 app/                               ← FastAPI middleware (Railway deployment)
@@ -788,8 +789,10 @@ pm-automation-system/
 │   │
 │   ├── rules/                            ← Business logic modules
 │   │   ├── __init__.py
-│   │   ├── brd_validator.py              ← BRD gate validation
-│   │   └── capacity_validator.py         ← Capacity planning logic
+│   │   ├── brd_gate.py                   ← BRD and Definition-of-Ready gates (comment + label; Jira blocks)
+│   │   ├── auto_classify.py              ← Bug/Feature classification (optional OpenAI, off by default)
+│   │   ├── duplicate_detection.py        ← Text matching, or embeddings if AI is enabled
+│   │   └── stale_cleanup.py              ← Stale-ticket report and manual cleanup endpoint
 │   │
 │   ├── api/                              ← API endpoints
 │   │   ├── __init__.py
@@ -802,28 +805,26 @@ pm-automation-system/
 │
 ├── ⚙️ config/                             ← Configuration files
 │   ├── jira-custom-fields.json           ← Field definitions with IDs
-│   ├── jira-workflow.yaml                ← Story workflow specification
+│   ├── jira-story-workflow.yaml          ← Story workflow specification
 │   ├── jira-epic-workflow.yaml           ← Epic workflow specification
-│   ├── jira-automation-rules.yaml        ← Story automation rules
+│   ├── jira-story-automation-rules.yaml  ← Story automation rules (including the DoR gate rules)
 │   └── jira-epic-automation-rules.yaml   ← Epic automation rules (7 rules)
 │
-├── 📜 scripts/                            ← Utility scripts
-│   ├── create_phase2_fields.py           ← Bulk field creation (11 fields)
-│   └── create_phase2_automation_rules.py ← Automation helper script
+├── 📜 create_phase2_fields.py            ← Bulk field creation (11 fields); helper scripts live in the repo root
+├── 📜 create_phase2_automation_rules.py  ← Automation helper script
 │
 ├── 📚 docs/                               ← Extended documentation
 │   ├── epic-workflow-design.md           ← Workflow design rationale
 │   ├── capacity-planning.md              ← Capacity methodology
-│   └── architecture.md                   ← Deep-dive architecture
+│   └── QUICKSTART.md                     ← Quick start
 │
-├── 📝 google-apps-script/                ← Google Apps Script source
-│   └── COMPLETE-WITH-REQUEST-TYPE.txt    ← Form→JIRA integration (300 LOC)
+├── 📝 google-apps-script-*.js / .txt     ← Google Apps Script source variants in the repo root
+│   (google-apps-script-COMPLETE-WITH-REQUEST-TYPE.txt is the Form→JIRA integration)
 │
 ├── 🚀 PHASE2_SETUP.md                    ← Phase 2 setup instructions
 ├── 📋 requirements.txt                    ← Python dependencies
 ├── 🐳 Dockerfile                          ← Railway containerization
-├── .gitignore                             ← Git ignore patterns
-└── LICENSE                                ← MIT License
+└── .gitignore                             ← Git ignore patterns
 ```
 
 <br>

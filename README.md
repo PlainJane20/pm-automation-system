@@ -83,6 +83,14 @@ This program-management automation reference implementation transforms manual st
 
 The workflow, configuration, API integration patterns, and project artifacts are implemented in this repository. Business-impact figures below are **modeled scenario estimates** based on stated baseline assumptions; they are not production telemetry, audited savings, or measured user outcomes. A production deployment should establish baselines, instrument cycle time and error rates, validate adoption, and have Finance confirm any cashable benefit.
 
+## Architecture pattern
+
+**Not an agent: an event-driven workflow/rules engine (webhook-triggered), with optional LLM assist that is off by default.** `app/webhooks.py` receives Jira events and schedules fixed rule functions in `app/rules/` (`brd_gate.py`, `stale_cleanup.py`, `auto_classify.py`, `duplicate_detection.py`). The README's "intelligent workflow orchestration" means these hard-coded rules; there is no planning, loop or autonomous decision-making.
+
+- **Deterministic vs model-driven:** The rules, gates and Jira transitions are deterministic. Only `auto_classify.py` and `duplicate_detection.py` can call OpenAI (a chat model and embeddings), and only when `ENABLE_AI_CLASSIFICATION` is on and `OPENAI_API_KEY` is set. Both fall back to keyword and text matching otherwise.
+- **Human gate:** The BRD and Definition-of-Ready gates (`brd_gate.py`) are "document-and-advise": the code comments and labels on a violation, and the Jira Automation rule performs the actual block. Humans do the approvals in Jira.
+- **Honest limit:** It reacts to events with fixed rules and cannot handle a case no rule covers.
+
 ## Competencies demonstrated
 
 | Competency | Observable evidence |

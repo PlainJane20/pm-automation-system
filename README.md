@@ -13,6 +13,7 @@
 [![Python](https://img.shields.io/badge/Python_3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![MIT License](https://img.shields.io/badge/License-MIT-6b7280?style=for-the-badge)](LICENSE)
 
 <br>
 
@@ -907,9 +908,7 @@ pm-automation-system/
 
 ## License
 
-This project is **proprietary and confidential**. All rights reserved.
-
-For inquiries regarding licensing, collaboration, or implementation consulting, please contact the author.
+MIT — see [LICENSE](LICENSE).
 
 ---
 

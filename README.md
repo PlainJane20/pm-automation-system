@@ -57,7 +57,7 @@ This program-management automation reference implementation transforms manual st
 
 **Core Capabilities:**
 - Automated Epic creation from stakeholder intake forms
-- Rules-based workflow automation: 7 Jira Automation rules plus fixed webhook rules in the FastAPI middleware (no AI planning; see [Architecture pattern](#architecture-pattern))
+- Rules-based workflow automation: 8 Epic Jira Automation rules (`config/jira-epic-automation-rules.yaml`, rule IDs 10-17) and 6 Story rule entries (`config/jira-story-automation-rules.yaml`, S0-S5; S3 calls the middleware), plus fixed webhook rules in the FastAPI middleware (no AI planning; see [Architecture pattern](#architecture-pattern))
 - Real-time roadmap visualization and capacity planning
 - Proactive stakeholder communication at every lifecycle stage
 
@@ -412,6 +412,8 @@ sequenceDiagram
 | **6. On Hold** | Epic transitioned | To status = ON_HOLD | Send email with blocker info | < 5 seconds |
 | **7. Approval** | Epic transitioned | To status = BACKLOG | Send email | < 5 seconds |
 
+*This table is a conceptual 7-row summary, not a 1:1 list of the YAML. `config/jira-epic-automation-rules.yaml` holds 8 rules (IDs 10-17): Welcome, Schedule to Roadmap, Activate, Auto-Complete, Rejection, On Hold, Capacity Warning for TPM, and Update Google Sheet on Status Change. There is no separate "Approval" rule entry in that file; the Capacity Warning and Google Sheet rules are not shown in the table.*
+
 <br>
 
 </details>
@@ -493,7 +495,7 @@ Cycle-time path demonstrated
 <td>
 • 11 custom fields<br/>
 • 8-status workflow<br/>
-• 7 automation rules<br/>
+• 8 Epic automation rules specified<br/>
 • Roadmap board
 </td>
 <td>2 weeks<br/>(40 hours)</td>
@@ -501,7 +503,7 @@ Cycle-time path demonstrated
 <td>
 Modeled cycle-time reduction<br/>
 Satisfaction target defined<br/>
-7 automation rules configured
+8 Epic automation rules specified in config
 </td>
 </tr>
 
@@ -809,7 +811,7 @@ pm-automation-system/
 │   ├── jira-story-workflow.yaml          ← Story workflow specification
 │   ├── jira-epic-workflow.yaml           ← Epic workflow specification
 │   ├── jira-story-automation-rules.yaml  ← Story automation rules (including the DoR gate rules)
-│   └── jira-epic-automation-rules.yaml   ← Epic automation rules (7 rules)
+│   └── jira-epic-automation-rules.yaml   ← Epic automation rules (8 rules, IDs 10-17)
 │
 ├── 📜 create_phase2_fields.py            ← Bulk field creation (11 fields); helper scripts live in the repo root
 ├── 📜 create_phase2_automation_rules.py  ← Automation helper script
